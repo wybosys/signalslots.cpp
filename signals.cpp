@@ -226,18 +226,6 @@ bool Signals::registerr(signal_t const &sig) {
     return true;
 }
 
-Slots::slot_type Signals::once(signal_t const &sig, Slot::callback_type cb) {
-    auto r = connect(sig, cb);
-    r->count = 1;
-    return r;
-}
-
-Slots::slot_type Signals::once(signal_t const &sig, Slot::callback_mem_type cb, SObject *target) {
-    auto r = connect(sig, cb, target);
-    r->count = 1;
-    return r;
-}
-
 Slots::slot_type Signals::connect(signal_t const &sig, Slot::callback_type cb) {
     auto fnd = __slots.find(sig);
     if (fnd == __slots.end()) {

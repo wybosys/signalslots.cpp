@@ -268,15 +268,16 @@ public:
 
     Slots::slot_type once(signal_t const &sig, Slot::callback_mem_type cb, SObject *target);
 
+    template<typename C>
+    Slots::slot_type once(signal_t const &sig, void (C::*cb)(Slot &), C *target);
+
     /** 连接信号插槽 */
     Slots::slot_type connect(signal_t const &sig, Slot::callback_type cb);
 
     Slots::slot_type connect(signal_t const &sig, Slot::callback_mem_type cb, SObject *target);
 
     template<typename C>
-    inline Slots::slot_type connect(signal_t const &sig, void (C::*cb)(Slot &), C *target) {
-        return connect(sig, ::std::bind(cb, target, ::std::placeholders::_1), target, (Slot::callback_mem_type) cb);
-    }
+    Slots::slot_type connect(signal_t const &sig, void (C::*cb)(Slot &), C *target);
 
     /** 该信号是否存在连接上的插槽 */
     [[nodiscard]]
@@ -334,6 +335,30 @@ private:
 
     // ::std::set<signal_t> __castings;
 };
+
+inline Slots::slot_type Signals::once(signal_t const &sig, Slot::callback_type cb) {
+    auto r = connect(sig, cb);
+    r->count = 1;
+    return r;
+}
+
+inline Slots::slot_type Signals::once(signal_t const &sig, Slot::callback_mem_type cb, SObject *target) {
+    auto r = connect(sig, cb, target);
+    r->count = 1;
+    return r;
+}
+
+template<typename C>
+inline Slots::slot_type Signals::once(signal_t const &sig, void (C::*cb)(Slot &), C *target) {
+    auto r = connect(sig, cb, target);
+    r->count = 1;
+    return r;
+}
+
+template<typename C>
+inline Slots::slot_type Signals::connect(signal_t const &sig, void (C::*cb)(Slot &), C *target) {
+    return connect(sig, ::std::bind(cb, target, ::std::placeholders::_1), target, (Slot::callback_mem_type) cb);
+}
 
 class Object {
 public:
