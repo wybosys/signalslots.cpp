@@ -34,33 +34,6 @@ class Slots;
 class Signals;
 
 template<typename T>
-class ReferenceOrPointer {
-public:
-    ReferenceOrPointer(T *v) : _ptr(v) {}
-
-    ReferenceOrPointer(T &v) : _ptr(&v) {}
-
-    inline T *operator->() {
-        return _ptr;
-    }
-
-    inline T const &operator->() const {
-        return _ptr;
-    }
-
-    inline operator T &() {
-        return *_ptr;
-    }
-
-    inline operator T const &() const {
-        return *_ptr;
-    }
-
-private:
-    T *_ptr;
-};
-
-template<typename T>
 class attach_ptr {
 public:
 
