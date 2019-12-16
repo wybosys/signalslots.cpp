@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <chrono>
 #include <future>
+#include <utility>
 
 SS_BEGIN
 
@@ -24,7 +25,7 @@ void Slot::setVeto(bool b) {
         tunnel->veto = b;
 }
 
-void Slot::emit(Slot::data_type data, Slot::tunnel_type tunnel) {
+void Slot::emit(Slot::data_type d, Slot::tunnel_type t) {
     if (eps) {
         seconds_t now = TimeCurrent();
         if (__epstm == 0) {
@@ -38,8 +39,8 @@ void Slot::emit(Slot::data_type data, Slot::tunnel_type tunnel) {
         }
     }
 
-    this->data = data;
-    this->tunnel = tunnel;
+    this->data = ::std::move(d);
+    this->tunnel = ::std::move(t);
 
     _doEmit();
 }
@@ -47,14 +48,15 @@ void Slot::emit(Slot::data_type data, Slot::tunnel_type tunnel) {
 void Slot::_doEmit() {
     if (target) {
         if (cb) {
+            cb(*this);
         } else if (!redirect.empty()) {
-            SObject *so = dynamic_cast<SObject *>(target.ptr());
+            auto so = dynamic_cast<SObject *>(target.ptr());
             if (so != nullptr) {
-
+                so->signals().emit(redirect, data);
             }
         }
     } else if (cb) {
-        // cb(*this);
+        cb(*this);
     }
 
     data = nullptr;
@@ -89,7 +91,7 @@ void Slots::add(Slots::slot_type s) {
     __slots.emplace_back(s);
 }
 
-::std::set<SObject *> Slots::emit(Slot::data_type data, Slot::tunnel_type tunnel) {
+::std::set<SObject *> Slots::emit(Slot::data_type d, Slot::tunnel_type t) {
     ::std::set<SObject *> r;
     if (isblocked())
         return r;
@@ -104,7 +106,7 @@ void Slots::add(Slots::slot_type s) {
         // 激发信号
         s->signal = signal;
         s->sender = owner;
-        s->emit(data, tunnel);
+        s->emit(d, t);
 
         // 控制激活数
         if (s->count && s->emitedCount >= s->count) {
@@ -127,22 +129,47 @@ void Slots::add(Slots::slot_type s) {
     return r;
 }
 
-bool Slots::disconnect(Slot::raw_callback_type cb, SObject *target) {
+bool Slots::disconnect(Slot::callback_type cb) {
     bool r = false;
-    for (auto const &iter:__slots) {
-        if (cb && iter->cb != cb)
-            continue;
-        if (iter->target == target) {
+    for (auto iter = __slots.begin(); iter != __slots.end();) {
+        auto s = *iter;
+
+        if (s->_cb == cb) {
             r = true;
-            // iter = __slots.erase(iter);
+            iter = __slots.erase(iter);
+        } else {
+            ++iter;
         }
     }
     return r;
 }
 
-Slots::slot_type Slots::find_connected_function(Slot::raw_callback_type cb, SObject *target) {
+bool Slots::disconnect(Slot::callback_mem_type cb, SObject *target) {
+    bool r = false;
+    for (auto iter = __slots.begin(); iter != __slots.end();) {
+        auto s = *iter;
+
+        if (s->_cbmem == cb &&
+            s->target == target) {
+            r = true;
+            iter = __slots.erase(iter);
+        } else {
+            ++iter;
+        }
+    }
+    return r;
+}
+
+Slots::slot_type Slots::find_connected_function(Slot::callback_type cb) {
     auto fnd = ::std::find_if(__slots.begin(), __slots.end(), [=](__slots_type::value_type &s) {
-        return s->cb == cb && s->target == target;
+        return s->_cb == cb;
+    });
+    return fnd == __slots.end() ? nullptr : *fnd;
+}
+
+Slots::slot_type Slots::find_connected_function(Slot::callback_mem_type cb, SObject *target) {
+    auto fnd = ::std::find_if(__slots.begin(), __slots.end(), [=](__slots_type::value_type &s) {
+        return s->_cbmem == cb && s->target == target;
     });
     return fnd == __slots.end() ? nullptr : *fnd;
 }
@@ -185,7 +212,7 @@ void Signals::clear() {
 
 bool Signals::registerr(signal_t const &sig) {
     if (sig.empty()) {
-        SS_LOG_WARN("不能注册一个空信号");
+        SS_LOG_WARN("不能注册一个空信号")
         return false;
     }
 
@@ -199,16 +226,43 @@ bool Signals::registerr(signal_t const &sig) {
     return true;
 }
 
-Slots::slot_type Signals::once(signal_t const &sig, Slot::raw_callback_type cb, SObject *target) {
+Slots::slot_type Signals::once(signal_t const &sig, Slot::callback_type cb) {
+    auto r = connect(sig, cb);
+    r->count = 1;
+    return r;
+}
+
+Slots::slot_type Signals::once(signal_t const &sig, Slot::callback_mem_type cb, SObject *target) {
     auto r = connect(sig, cb, target);
     r->count = 1;
     return r;
 }
 
-Slots::slot_type Signals::connect(signal_t const &sig, Slot::raw_callback_type cb, SObject *target) {
+Slots::slot_type Signals::connect(signal_t const &sig, Slot::callback_type cb) {
     auto fnd = __slots.find(sig);
     if (fnd == __slots.end()) {
-        SS_LOG_WARN("对象信号 " + sig + " 不存在");
+        SS_LOG_WARN("对象信号 " + sig + " 不存在")
+        return nullptr;
+    }
+    auto ss = fnd->second;
+
+    // 判断是否已经连接
+    auto s = ss->find_connected_function(cb);
+    if (s)
+        return s;
+
+    s = ::std::make_shared<Slot>();
+    s->_cb = cb;
+    s->cb = cb;
+    ss->add(s);
+
+    return s;
+}
+
+Slots::slot_type Signals::connect(signal_t const &sig, Slot::callback_mem_type cb, SObject *target) {
+    auto fnd = __slots.find(sig);
+    if (fnd == __slots.end()) {
+        SS_LOG_WARN("对象信号 " + sig + " 不存在")
         return nullptr;
     }
     auto ss = fnd->second;
@@ -219,7 +273,32 @@ Slots::slot_type Signals::connect(signal_t const &sig, Slot::raw_callback_type c
         return s;
 
     s = ::std::make_shared<Slot>();
-    s->cb = cb;
+    s->_cbmem = cb;
+    s->cb = ::std::bind(cb, target, ::std::placeholders::_1);
+    s->target = target;
+    ss->add(s);
+
+    __inv_connect(target);
+
+    return s;
+}
+
+Slots::slot_type Signals::connect(signal_t const &sig, Slot::callback_comm_type cb, SObject *target, Slot::callback_mem_type cbmem) {
+    auto fnd = __slots.find(sig);
+    if (fnd == __slots.end()) {
+        SS_LOG_WARN("对象信号 " + sig + " 不存在")
+        return nullptr;
+    }
+    auto ss = fnd->second;
+
+    // 判断是否已经连接
+    auto s = ss->find_connected_function(cbmem, target);
+    if (s)
+        return s;
+
+    s = ::std::make_shared<Slot>();
+    s->_cbmem = cbmem;
+    s->cb = ::std::move(cb);
     s->target = target;
     ss->add(s);
 
@@ -256,15 +335,15 @@ Slots::slot_type Signals::redirect(signal_t const &sig1, signal_t const &sig2, S
     return s;
 }
 
-void Signals::emit(signal_t const &sig, Slot::data_type data, Slot::tunnel_type tunnel) {
+void Signals::emit(signal_t const &sig, Slot::data_type d, Slot::tunnel_type t) {
     auto fnd = __slots.find(sig);
     if (fnd == __slots.end()) {
-        SS_LOG_WARN("对象信号 " + sig + " 不存在");
+        SS_LOG_WARN("对象信号 " + sig + " 不存在")
         return;
     }
 
     auto &ss = fnd->second;
-    auto targets = ss->emit(data, tunnel);
+    auto targets = ss->emit(d, t);
     if (!targets.empty()) {
         // 收集所有被移除的target，并断开反向连接
         for (auto &iter:targets) {
@@ -287,7 +366,34 @@ void Signals::disconnectOfTarget(SObject *target, bool inv) {
         __inv_disconnect(target);
 }
 
-void Signals::disconnect(signal_t const &sig, Slot::raw_callback_type cb, SObject *target) {
+void Signals::disconnect(signal_t const &sig) {
+    disconnect(sig, nullptr);
+}
+
+void Signals::disconnect(signal_t const &sig, Slot::callback_type cb) {
+    auto fnd = __slots.find(sig);
+    if (fnd == __slots.end())
+        return;
+    auto &ss = fnd->second;
+
+    if (cb == nullptr) {
+        // 清除sig的所有插槽，自动断开反向引用
+        ::std::set<SObject *> targets;
+        for (const auto &iter:ss->__slots) {
+            if (iter->target)
+                targets.insert(iter->target);
+        }
+        ss->__slots.clear();
+        for (auto &iter:targets) {
+            if (!isConnectedOfTarget(iter))
+                __inv_disconnect(iter);
+        }
+    } else {
+        ss->disconnect(cb);
+    }
+}
+
+void Signals::disconnect(signal_t const &sig, Slot::callback_mem_type cb, SObject *target) {
     auto fnd = __slots.find(sig);
     if (fnd == __slots.end())
         return;

@@ -12,12 +12,13 @@
 #include <set>
 #include <map>
 #include <iostream>
+#include <functional>
 
 SS_BEGIN
 
-#define SS_LOG_WARN(msg) ::std::cerr << msg << ::std::endl;
-#define SS_LOG_INFO(msg) ::std::cout << msg << ::std::endl;
-#define SS_LOG_FATAL(msg) { ::std::cerr << msg << ::std::endl; throw msg; }
+#define SS_LOG_WARN(msg) ::std::cerr << (msg) << ::std::endl;
+#define SS_LOG_INFO(msg) ::std::cout << (msg) << ::std::endl;
+#define SS_LOG_FATAL(msg) { ::std::cerr << (msg) << ::std::endl; throw msg; }
 
 typedef double seconds_t;
 typedef ::std::string signal_t;
@@ -111,11 +112,11 @@ struct Tunnel {
 class Slot {
 public:
 
-    typedef void (*raw_callback_type)();
+    typedef void (*callback_type)(Slot &);
 
-    typedef void (*callback_type)(Slot const &s);
+    typedef void (SObject::*callback_mem_type)(Slot &);
 
-    typedef void (Object::*object_callback_type)(Slot const &s);
+    typedef ::std::function<void(Slot &)> callback_comm_type;
 
     typedef ::std::shared_ptr<Tunnel> tunnel_type;
     typedef ::std::shared_ptr<IPayload> payload_type;
@@ -124,8 +125,8 @@ public:
     /** 重定向的信号 */
     signal_t redirect;
 
-    /** 回调 */
-    raw_callback_type cb = nullptr;
+    // 通用回调对象
+    callback_comm_type cb;
 
     /** 回调的上下文 */
     attach_ptr<SObject> target;
@@ -169,10 +170,20 @@ protected:
 
     void _doEmit();
 
+    //  函数回调
+    callback_type _cb = nullptr;
+
+    // 对象的函数回调
+    callback_mem_type _cbmem = nullptr;
+
 private:
 
     seconds_t __epstm = 0;
     bool __veto;
+
+    friend class Slots;
+
+    friend class Signals;
 };
 
 class Slots {
@@ -207,9 +218,13 @@ public:
      */
     ::std::set<SObject *> emit(Slot::data_type data, Slot::tunnel_type tunnel);
 
-    bool disconnect(Slot::raw_callback_type cb, SObject *target);
+    bool disconnect(Slot::callback_type cb);
 
-    slot_type find_connected_function(Slot::raw_callback_type cb, SObject *target);
+    bool disconnect(Slot::callback_mem_type cb, SObject *target);
+
+    slot_type find_connected_function(Slot::callback_type cb);
+
+    slot_type find_connected_function(Slot::callback_mem_type cb, SObject *target);
 
     slot_type find_redirected(signal_t const &sig, SObject *target);
 
@@ -225,7 +240,7 @@ private:
     /** 阻塞信号
      * @note emit被阻塞的信号将不会有任何作用
      */
-    uint __block = 0;
+    int __block = 0;
 
     friend class Signals;
 };
@@ -249,10 +264,19 @@ public:
     SObject &owner;
 
     /** 只连接一次 */
-    Slots::slot_type once(signal_t const &sig, Slot::raw_callback_type cb, SObject *target = nullptr);
+    Slots::slot_type once(signal_t const &sig, Slot::callback_type cb);
+
+    Slots::slot_type once(signal_t const &sig, Slot::callback_mem_type cb, SObject *target);
 
     /** 连接信号插槽 */
-    Slots::slot_type connect(signal_t const &sig, Slot::raw_callback_type cb, SObject *target = nullptr);
+    Slots::slot_type connect(signal_t const &sig, Slot::callback_type cb);
+
+    Slots::slot_type connect(signal_t const &sig, Slot::callback_mem_type cb, SObject *target);
+
+    template<typename C>
+    inline Slots::slot_type connect(signal_t const &sig, void (C::*cb)(Slot &), C *target) {
+        return connect(sig, ::std::bind(cb, target, ::std::placeholders::_1), target, (Slot::callback_mem_type) cb);
+    }
 
     /** 该信号是否存在连接上的插槽 */
     [[nodiscard]]
@@ -274,7 +298,11 @@ public:
     /** 断开连接 */
     void disconnectOfTarget(SObject *target, bool inv = true);
 
-    void disconnect(signal_t const &sig, Slot::raw_callback_type cb = nullptr, SObject *target = nullptr);
+    void disconnect(signal_t const &sig);
+
+    void disconnect(signal_t const &sig, Slot::callback_type cb);
+
+    void disconnect(signal_t const &sig, Slot::callback_mem_type cb, SObject *target);
 
     bool isConnectedOfTarget(SObject *target) const;
 
@@ -289,6 +317,8 @@ public:
 protected:
 
     // void _doCastings();
+
+    Slots::slot_type connect(signal_t const &sig, Slot::callback_comm_type cb, SObject *target, Slot::callback_mem_type cbmem);
 
 private:
 
