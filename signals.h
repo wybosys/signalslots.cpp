@@ -4,6 +4,7 @@
 
 #define SS_BEGIN namespace Ss {
 #define SS_END }
+#define USE_SS using namespace Ss;
 
 #include <memory>
 #include <string>
