@@ -149,8 +149,12 @@ bool Slots::disconnect(Slot::callback_mem_type cb, SObject *target) {
     for (auto iter = __slots.begin(); iter != __slots.end();) {
         auto s = *iter;
 
-        if (s->_cbmem == cb &&
-            s->target == target) {
+        if (cb && s->_cbmem != cb) {
+            ++iter;
+            continue;
+        }
+
+        if (s->target == target) {
             r = true;
             iter = __slots.erase(iter);
         } else {

@@ -338,20 +338,23 @@ private:
 
 inline Slots::slot_type Signals::once(signal_t const &sig, Slot::callback_type cb) {
     auto r = connect(sig, cb);
-    r->count = 1;
+    if (r)
+        r->count = 1;
     return r;
 }
 
 inline Slots::slot_type Signals::once(signal_t const &sig, Slot::callback_mem_type cb, SObject *target) {
     auto r = connect(sig, cb, target);
-    r->count = 1;
+    if (r)
+        r->count = 1;
     return r;
 }
 
 template<typename C>
 inline Slots::slot_type Signals::once(signal_t const &sig, void (C::*cb)(Slot &), C *target) {
     auto r = connect(sig, cb, target);
-    r->count = 1;
+    if (r)
+        r->count = 1;
     return r;
 }
 
