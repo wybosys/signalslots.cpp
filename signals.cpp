@@ -226,7 +226,7 @@ bool Signals::registerr(signal_t const &sig) {
     auto ss = ::std::make_shared<Slots>();
     ss->signal = sig;
     ss->owner = &owner;
-    __slots.insert(::std::pair(sig, ss));
+    __slots.insert(::std::make_pair(sig, ss));
     return true;
 }
 
