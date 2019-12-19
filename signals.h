@@ -213,7 +213,7 @@ private:
     /** 阻塞信号
      * @note emit被阻塞的信号将不会有任何作用
      */
-    int __block = 0;
+    int __blk = 0;
 
     friend class Signals;
 };

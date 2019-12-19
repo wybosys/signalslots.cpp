@@ -76,15 +76,15 @@ void Slots::clear() {
 }
 
 void Slots::block() {
-    ++__block;
+    ++__blk;
 }
 
 void Slots::unblock() {
-    --__block;
+    --__blk;
 }
 
 bool Slots::isblocked() const {
-    return __block != 0;
+    return __blk != 0;
 }
 
 void Slots::add(Slots::slot_type s) {
