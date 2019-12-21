@@ -251,6 +251,21 @@ Slots::slot_type Signals::connect(signal_t const &sig, Slot::callback_type cb) {
     return s;
 }
 
+Slots::slot_type Signals::connect(signal_t const &sig, Slot::callback_comm_type cb) {
+    auto fnd = __slots.find(sig);
+    if (fnd == __slots.end()) {
+        SS_LOG_WARN("对象信号 " + sig + " 不存在")
+        return nullptr;
+    }
+    auto ss = fnd->second;
+    auto s = ::std::make_shared<Slot>();
+
+    s->cb = std::move(cb);
+    ss->add(s);
+
+    return s;
+}
+
 Slots::slot_type Signals::connect(signal_t const &sig, Slot::callback_mem_type cb, SObject *target) {
     auto fnd = __slots.find(sig);
     if (fnd == __slots.end()) {
@@ -328,6 +343,8 @@ Slots::slot_type Signals::redirect(signal_t const &sig1, signal_t const &sig2, S
 }
 
 void Signals::emit(signal_t const &sig, Slot::data_type d, Slot::tunnel_type t) {
+    SOBJECT_AUTOREF(owner);
+
     auto fnd = __slots.find(sig);
     if (fnd == __slots.end()) {
         SS_LOG_WARN("对象信号 " + sig + " 不存在")

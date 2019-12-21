@@ -2,9 +2,10 @@
 
 // github.com/wybosys/cppsignals.git
 
-#define SS_BEGIN namespace Ss {
+#define SS_NS Ss
+#define SS_BEGIN namespace SS_NS {
 #define SS_END }
-#define USE_SS using namespace Ss;
+#define USE_SS using namespace SS_NS;
 
 #include <memory>
 #include <string>
@@ -13,6 +14,7 @@
 #include <map>
 #include <iostream>
 #include <functional>
+#include <atomic>
 
 SS_BEGIN
 
@@ -247,6 +249,8 @@ public:
     /** 连接信号插槽 */
     Slots::slot_type connect(signal_t const &sig, Slot::callback_type cb);
 
+    Slots::slot_type connect(signal_t const &sig, Slot::callback_comm_type cb);
+
     Slots::slot_type connect(signal_t const &sig, Slot::callback_mem_type cb, SObject *target);
 
     template<typename C>
@@ -341,7 +345,25 @@ public:
     virtual ~Object() = default;
 };
 
-class SObject : public Object {
+class RefObject : public Object {
+public:
+
+    RefObject() : __ref_cnt(1) {}
+
+    void grab() {
+        ++__ref_cnt;
+    }
+
+    void drop() {
+        if (--__ref_cnt == 0)
+            delete this;
+    }
+
+private:
+    ::std::atomic_int __ref_cnt;
+};
+
+class SObject : public RefObject {
 public:
 
     SObject() : _s(*this) {}
@@ -353,5 +375,26 @@ public:
 private:
     Signals _s;
 };
+
+struct __SObject_AutoRef {
+    explicit __SObject_AutoRef(SObject &ro) : _ro(&ro) {
+        _ro->grab();
+    }
+
+    explicit __SObject_AutoRef(SObject *ro) : _ro(ro) {
+        _ro->grab();
+    }
+
+    ~__SObject_AutoRef() {
+        _ro->drop();
+    }
+
+    SObject *_ro;
+};
+
+#define __SS_COMBINE(L, R) L##R
+#define _SS_COMBINE(L, R) __SS_COMBINE(L, R)
+
+#define SOBJECT_AUTOREF(obj) ::SS_NS::__SObject_AutoRef _SS_COMBINE(__auto_refobj_, __LINE__)(obj);
 
 SS_END
