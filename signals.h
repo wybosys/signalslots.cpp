@@ -354,9 +354,12 @@ public:
         ++__ref_cnt;
     }
 
-    void drop() {
-        if (--__ref_cnt == 0)
+    RefObject *drop() {
+        if (--__ref_cnt == 0) {
             delete this;
+            return nullptr;
+        }
+        return this;
     }
 
 private:
