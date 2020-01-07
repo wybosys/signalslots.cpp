@@ -369,6 +369,8 @@ private:
 class SObject : public RefObject {
 public:
 
+    typedef signal_t signal_t;
+
     SObject() : _s(*this) {}
 
     inline Signals &signals() {
