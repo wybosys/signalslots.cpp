@@ -401,5 +401,6 @@ struct __SObject_AutoRef {
 #define _SS_COMBINE(L, R) __SS_COMBINE(L, R)
 
 #define SOBJECT_AUTOREF(obj) ::SS_NS::__SObject_AutoRef _SS_COMBINE(__auto_refobj_, __LINE__)(obj);
+#define SS_SIGNAL(sig) static const Ss::signal_t sig;
 
 SS_END
