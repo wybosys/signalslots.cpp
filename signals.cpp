@@ -195,11 +195,7 @@ bool Slots::is_connected(SObject *target) const {
 // ---------------------------------------- signals
 
 Signals::~Signals() {
-    // 反向断开连接
-    for (auto iter: __invs) {
-        iter->owner.signals().disconnectOfTarget(&owner, false);
-    }
-    __invs.clear();
+    clear();
 }
 
 void Signals::clear() {
@@ -207,11 +203,13 @@ void Signals::clear() {
     for (auto &iter:__invs) {
         iter->owner.signals().disconnectOfTarget(&owner, false);
     }
+    __invs.clear();
 
     // 清空slot的连接
     for (auto const &iter: __slots) {
         iter.second->clear();
     }
+    __slots.clear();
 }
 
 bool Signals::registerr(signal_t const &sig) {
