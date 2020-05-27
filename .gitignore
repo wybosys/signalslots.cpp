@@ -1,5 +1,6 @@
 \.DS_Store
 \.vscode
+\.vs
 build
 tmp
 *\.tmp

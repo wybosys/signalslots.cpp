@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 // github.com/wybosys/cppsignals.git
 
@@ -22,12 +22,9 @@ SS_BEGIN
 #define SS_LOG_INFO(msg) ::std::cout << (msg) << ::std::endl;
 #define SS_LOG_FATAL(msg) { ::std::cerr << (msg) << ::std::endl; throw msg; }
 
-typedef double seconds_t;
 typedef ::std::string signal_t;
 
 class Object;
-
-class SObject;
 
 class Slot;
 
@@ -87,11 +84,12 @@ struct Tunnel {
 class Slot {
 public:
 
-    typedef void (*callback_type)(Slot &);
+    typedef void (*pfn_callback_type)(Slot &);
 
-    typedef void (SObject::*callback_mem_type)(Slot &);
+    typedef void (Object::*pfn_membercallback_type)(Slot &);
 
-    typedef ::std::function<void(Slot &)> callback_comm_type;
+    // 基于function对象实现的slot不能disconnect和查询有无连接，受制于stl所限
+    typedef ::std::function<void(Slot &)> callback_type;
 
     typedef ::std::shared_ptr<Tunnel> tunnel_type;
     typedef ::std::shared_ptr<IPayload> payload_type;
@@ -101,13 +99,13 @@ public:
     signal_t redirect;
 
     // 通用回调对象
-    callback_comm_type cb;
+    callback_type cb;
 
     /** 回调的上下文 */
-    attach_ptr<SObject> target;
+    attach_ptr<Object> target;
 
     /** 激发者 */
-    attach_ptr<SObject> sender;
+    attach_ptr<Object> sender;
 
     /** 数据 */
     data_type data;
@@ -125,10 +123,9 @@ public:
     signal_t signal;
 
     /** 激发频率限制 (emits per second) */
-    ushort eps = 0;
+    unsigned short eps = 0;
 
     /** 是否中断掉信号调用树 */
-    [[nodiscard]]
     bool getVeto() const;
 
     void setVeto(bool b);
@@ -146,15 +143,15 @@ protected:
     void _doEmit();
 
     //  函数回调
-    callback_type _cb = nullptr;
+    pfn_callback_type _pfn_cb = nullptr;
 
     // 对象的函数回调
-    callback_mem_type _cbmem = nullptr;
+    pfn_membercallback_type _pfn_memcb = nullptr;
 
 private:
 
-    seconds_t __epstm = 0;
-    bool __veto;
+    double _epstm = 0;
+    bool _veto;
 
     friend class Slots;
 
@@ -169,7 +166,7 @@ public:
     ~Slots();
 
     // 所有者，会传递到 Slot 的 sender
-    attach_ptr<SObject> owner;
+    attach_ptr<Object> owner;
 
     // 信号源
     signal_t signal;
@@ -182,7 +179,6 @@ public:
     void unblock();
 
     /** 是否已经阻塞 */
-    [[nodiscard]]
     bool isblocked() const;
 
     /** 添加一个插槽 */
@@ -191,31 +187,31 @@ public:
     /** 对所有插槽激发信号
      * @note 返回被移除的插槽的对象
      */
-    ::std::set<SObject *> emit(Slot::data_type data, Slot::tunnel_type tunnel);
+    ::std::set<Object *> emit(Slot::data_type data, Slot::tunnel_type tunnel);
 
-    bool disconnect(Slot::callback_type cb);
+    bool disconnect(Slot::pfn_callback_type cb);
 
-    bool disconnect(Slot::callback_mem_type cb, SObject *target);
+    bool disconnect(Slot::pfn_membercallback_type cb, Object *target);
 
-    slot_type find_connected_function(Slot::callback_type cb);
+    slot_type find_connected_function(Slot::pfn_callback_type cb);
 
-    slot_type find_connected_function(Slot::callback_mem_type cb, SObject *target);
+    slot_type find_connected_function(Slot::pfn_membercallback_type cb, Object *target);
 
-    slot_type find_redirected(signal_t const &sig, SObject *target);
+    slot_type find_redirected(signal_t const &sig, Object *target);
 
-    bool is_connected(SObject *target) const;
+    bool is_connected(Object *target) const;
 
 private:
 
-    typedef ::std::vector<slot_type> __slots_type;
+    typedef ::std::vector<slot_type> slots_type;
 
     // 保存所有插槽
-    __slots_type __slots;
+    slots_type _slots;
 
     /** 阻塞信号
      * @note emit被阻塞的信号将不会有任何作用
      */
-    int __blk = 0;
+    int _blk = 0;
 
     friend class Signals;
 };
@@ -225,8 +221,12 @@ public:
 
     typedef ::std::shared_ptr<Slots> slots_type;
 
-    explicit Signals(SObject &owner) : owner(owner) {}
-
+    explicit Signals(Object* owner)
+        : owner(owner)
+    {
+        // pass
+    }
+    
     ~Signals();
 
     // 清空
@@ -236,12 +236,14 @@ public:
     bool registerr(signal_t const &sig);
 
     // 信号的主体
-    SObject &owner;
+    attach_ptr<Object> owner;
 
     /** 只连接一次 */
     Slots::slot_type once(signal_t const &sig, Slot::callback_type cb);
 
-    Slots::slot_type once(signal_t const &sig, Slot::callback_mem_type cb, SObject *target);
+    Slots::slot_type once(signal_t const &sig, Slot::pfn_callback_type cb);
+
+    Slots::slot_type once(signal_t const &sig, Slot::pfn_membercallback_type cb, Object *target);
 
     template<typename C>
     Slots::slot_type once(signal_t const &sig, void (C::*cb)(Slot &), C *target);
@@ -249,21 +251,20 @@ public:
     /** 连接信号插槽 */
     Slots::slot_type connect(signal_t const &sig, Slot::callback_type cb);
 
-    Slots::slot_type connect(signal_t const &sig, Slot::callback_comm_type cb);
+    Slots::slot_type connect(signal_t const &sig, Slot::pfn_callback_type cb);
 
-    Slots::slot_type connect(signal_t const &sig, Slot::callback_mem_type cb, SObject *target);
+    Slots::slot_type connect(signal_t const &sig, Slot::pfn_membercallback_type cb, Object *target);
 
     template<typename C>
     Slots::slot_type connect(signal_t const &sig, void (C::*cb)(Slot &), C *target);
 
     /** 该信号是否存在连接上的插槽 */
-    [[nodiscard]]
     bool isConnected(signal_t const &sig) const;
 
     /** 转发一个信号到另一个对象的信号 */
-    Slots::slot_type redirect(signal_t const &sig1, signal_t const &sig2, SObject *target);
+    Slots::slot_type redirect(signal_t const &sig1, signal_t const &sig2, Object *target);
 
-    Slots::slot_type redirect(signal_t const &sig, SObject *target);
+    Slots::slot_type redirect(signal_t const &sig, Object *target);
 
     /** 激发信号 */
     void emit(signal_t const &sig, Slot::data_type data = nullptr, Slot::tunnel_type tunnel = nullptr);
@@ -274,58 +275,43 @@ public:
     // void cast(signal_t const &sig);
 
     /** 断开连接 */
-    void disconnectOfTarget(SObject *target, bool inv = true);
+    void disconnectOfTarget(Object *target, bool inv = true);
 
     void disconnect(signal_t const &sig);
 
-    void disconnect(signal_t const &sig, Slot::callback_type cb);
+    void disconnect(signal_t const &sig, Slot::pfn_callback_type cb);
 
-    void disconnect(signal_t const &sig, Slot::callback_mem_type cb, SObject *target);
+    void disconnect(signal_t const &sig, Slot::pfn_membercallback_type cb, Object *target);
 
-    bool isConnectedOfTarget(SObject *target) const;
+    bool isConnectedOfTarget(Object *target) const;
 
     /** 阻塞一个信号，将不响应激发 */
     void block(signal_t const &sig);
 
     void unblock(signal_t const &sig);
 
-    [[nodiscard]]
     bool isblocked(signal_t const &sig) const;
 
 protected:
 
     // void _doCastings();
 
-    Slots::slot_type connect(signal_t const &sig, Slot::callback_comm_type cb, SObject *target, Slot::callback_mem_type cbmem);
+    Slots::slot_type connect(signal_t const &sig, Slot::callback_type cb, Object *target, Slot::pfn_membercallback_type cbmem);
 
 private:
 
-    void __inv_connect(SObject *target);
+    void _inv_connect(Object *target);
 
-    void __inv_disconnect(SObject *target);
+    void _inv_disconnect(Object *target);
 
     // 反向登记，当自身 dispose 时，需要和对方断开
-    ::std::set<Signals *> __invs;
+    ::std::set<Signals *> _invs;
 
-    typedef ::std::map<signal_t, slots_type> __slots_type;
-    __slots_type __slots;
+    typedef ::std::map<signal_t, slots_type> signals_type;
+    signals_type _signals;
 
-    // ::std::set<signal_t> __castings;
+    // ::std::set<signal_t> _castings;
 };
-
-inline Slots::slot_type Signals::once(signal_t const &sig, Slot::callback_type cb) {
-    auto r = connect(sig, cb);
-    if (r)
-        r->count = 1;
-    return r;
-}
-
-inline Slots::slot_type Signals::once(signal_t const &sig, Slot::callback_mem_type cb, SObject *target) {
-    auto r = connect(sig, cb, target);
-    if (r)
-        r->count = 1;
-    return r;
-}
 
 template<typename C>
 inline Slots::slot_type Signals::once(signal_t const &sig, void (C::*cb)(Slot &), C *target) {
@@ -337,70 +323,35 @@ inline Slots::slot_type Signals::once(signal_t const &sig, void (C::*cb)(Slot &)
 
 template<typename C>
 inline Slots::slot_type Signals::connect(signal_t const &sig, void (C::*cb)(Slot &), C *target) {
-    return connect(sig, ::std::bind(cb, target, ::std::placeholders::_1), target, (Slot::callback_mem_type) cb);
+    return connect(sig, ::std::bind(cb, target, ::std::placeholders::_1), target, (Slot::pfn_membercallback_type)cb);
 }
 
 class Object {
 public:
-    virtual ~Object() = default;
-};
 
-class RefObject : public Object {
-public:
-
-    RefObject() : __ref_cnt(1) {}
-
-    void grab() {
-        ++__ref_cnt;
+    Object() 
+        :_s(::std::make_shared<Signals>(this))
+    {
+        // pass
     }
 
-    RefObject *drop() {
-        if (--__ref_cnt == 0) {
-            delete this;
-            return nullptr;
+    virtual ~Object() {
+        if (_s) {
+            _s->clear();
+            _s->owner = nullptr;
+            _s = nullptr;
         }
-        return this;
     }
-
-private:
-    ::std::atomic_int __ref_cnt;
-};
-
-class SObject : public RefObject {
-public:
-
-    typedef signal_t signal_t;
-
-    SObject() : _s(*this) {}
 
     inline Signals &signals() {
-        return _s;
+        return *_s;
     }
 
 private:
-    Signals _s;
+    ::std::shared_ptr<Signals> _s;
+    friend class Signals;
 };
 
-struct __SObject_AutoRef {
-    explicit __SObject_AutoRef(SObject &ro) : _ro(&ro) {
-        _ro->grab();
-    }
-
-    explicit __SObject_AutoRef(SObject *ro) : _ro(ro) {
-        _ro->grab();
-    }
-
-    ~__SObject_AutoRef() {
-        _ro->drop();
-    }
-
-    SObject *_ro;
-};
-
-#define __SS_COMBINE(L, R) L##R
-#define _SS_COMBINE(L, R) __SS_COMBINE(L, R)
-
-#define SOBJECT_AUTOREF(obj) ::SS_NS::__SObject_AutoRef _SS_COMBINE(__auto_refobj_, __LINE__)(obj);
 #define SS_SIGNAL(sig) static const Ss::signal_t sig;
 
 SS_END
