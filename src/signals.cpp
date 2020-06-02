@@ -444,10 +444,12 @@ void Signals::disconnect(signal_t const &sig, Slot::pfn_membercallback_type cb, 
 }
 
 bool Signals::isConnectedOfTarget(Object *target) const {
-    auto fnd = ::std::find_if(_signals.cbegin(), _signals.cend(), [&](auto const &ss) -> bool {
-        return ss.second->is_connected(target);
-    });
-    return fnd != _signals.end();
+    for (auto iter = _signals.cbegin(); iter != _signals.end(); ++iter) {
+        if (iter->second->is_connected(target)) {
+            return true;
+        }
+    }
+    return false;
 }
 
 void Signals::block(signal_t const &sig) {
