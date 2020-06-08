@@ -2,6 +2,8 @@
 
 // github.com/wybosys/cppsignals.git
 
+#include "com++.hpp"
+
 #define SS_NS Ss
 #define SS_BEGIN namespace SS_NS {
 #define SS_END }
@@ -66,10 +68,6 @@ private:
     T *_ptr;
 };
 
-struct IPayload {
-    virtual ~IPayload() = default;
-};
-
 // 用于穿透整个emit流程的对象
 struct Tunnel {
 
@@ -77,7 +75,7 @@ struct Tunnel {
     bool veto;
 
     /** 附加数据 */
-    ::std::shared_ptr<IPayload> payload;
+    ::std::shared_ptr<::COMXX_NS::Variant<> > payload;
 };
 
 // 插槽对象
@@ -92,7 +90,7 @@ public:
     typedef ::std::function<void(Slot &)> callback_type;
 
     typedef ::std::shared_ptr<Tunnel> tunnel_type;
-    typedef ::std::shared_ptr<IPayload> payload_type;
+    typedef ::std::shared_ptr<::COMXX_NS::Variant<> > payload_type;
     typedef payload_type data_type;
 
     /** 重定向的信号 */

@@ -20,7 +20,10 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\src\signals.h">
+    <ClInclude Include="..\..\src\signals.hpp">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\com++.hpp">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>

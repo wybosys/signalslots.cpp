@@ -1,4 +1,4 @@
-﻿#include "../src/signals.h"
+﻿#include "../src/signals.hpp"
 
 USE_SS;
 using namespace std;

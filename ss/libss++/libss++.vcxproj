@@ -22,7 +22,8 @@
     <ClCompile Include="..\..\src\signals.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\src\signals.h" />
+    <ClInclude Include="..\..\src\com++.hpp" />
+    <ClInclude Include="..\..\src\signals.hpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>15.0</VCProjectVersion>
