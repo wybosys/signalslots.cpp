@@ -192,6 +192,11 @@ private:
     ::std::shared_ptr<func_type> _func;
 };
 
+template <typename V>
+static ::std::shared_ptr<Variant<> > _V(V const& v) {
+    return ::std::make_shared<Variant<> >(v);
+}
+
 typedef ::std::initializer_list<Variant<> > args_t;
 
 #define COMXX_PPARGS_0(args)
