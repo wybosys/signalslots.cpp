@@ -356,7 +356,7 @@ Slots::slot_type Signals::redirect(signal_t const &sig1, signal_t const &sig2, O
     return s;
 }
 
-void Signals::emit(signal_t const &sig, Slot::data_type d, Slot::tunnel_type t) {
+void Signals::emit(signal_t const &sig, Slot::data_type d, Slot::tunnel_type t) const {
     // 保护signals，避免运行期被释放
     ::std::shared_ptr<Signals> lifekeep(owner->_s);
 
@@ -477,12 +477,12 @@ void Signals::_inv_connect(Object *target) {
     target->signals()._invs.insert(this);
 }
 
-void Signals::_inv_disconnect(Object *target) {
+void Signals::_inv_disconnect(Object *target) const {
     if (target == nullptr)
         return;
     if (&target->signals() == this)
         return;
-    target->signals()._invs.erase(this);
+    target->signals()._invs.erase((Signals*)this);
 }
 
 SS_END

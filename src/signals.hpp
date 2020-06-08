@@ -267,7 +267,7 @@ public:
     Slots::slot_type redirect(signal_t const &sig, Object *target);
 
     /** 激发信号 */
-    void emit(signal_t const &sig, Slot::data_type data = nullptr, Slot::tunnel_type tunnel = nullptr);
+    void emit(signal_t const& sig, Slot::data_type data = nullptr, Slot::tunnel_type tunnel = nullptr) const;
 
     /** 向外抛出信号
      * @note 为了解决诸如金币变更、元宝变更等大部分同时发生的事件但是因为set的时候不能把这些的修改函数合并成1个函数处理，造成同一个消息短时间多次激活，所以使用该函数可以在下一帧开始后归并发出唯一的事件。所以该函数出了信号外不支持其他带参
@@ -302,7 +302,7 @@ private:
 
     void _inv_connect(Object *target);
 
-    void _inv_disconnect(Object *target);
+    void _inv_disconnect(Object* target) const;
 
     // 反向登记，当自身 dispose 时，需要和对方断开
     ::std::set<Signals *> _invs;
@@ -344,6 +344,10 @@ public:
     }
 
     inline Signals &signals() {
+        return *_s;
+    }
+
+    inline Signals const& signals() const {
         return *_s;
     }
 
