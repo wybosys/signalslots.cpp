@@ -16,6 +16,7 @@
 #include <initializer_list>
 #include <vector>
 #include <map>
+#include <cassert>
 
 COMXX_BEGIN
 
