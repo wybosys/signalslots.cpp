@@ -15,6 +15,16 @@ static double TimeCurrent() {
 
 // ------------------------------------- slot
 
+Slot::Slot()
+{
+    // pass
+}
+
+Slot::~Slot()
+{
+    // pass
+}
+
 bool Slot::getVeto() const {
     return _veto;
 }
@@ -46,26 +56,24 @@ void Slot::emit(Slot::data_type d, Slot::tunnel_type t) {
 }
 
 void Slot::_doEmit() {
-    if (target) {
-        if (cb) {
-            cb(*this);
-        } else if (!redirect.empty()) {
-            auto so = dynamic_cast<Object *>(target.ptr());
-            if (so != nullptr) {
-                so->signals().emit(redirect, data);
-            }
-        }
-    } else if (cb) {
-        cb(*this);
-    }
+    // 成员函数指针会将target通过bind到函数对象中，所以不需要采用传统调用成员指针的方法调用
+    // 普通函数指针可以直接调用
+    cb(*this);
 
+    // 清理
     data = nullptr;
     tunnel = nullptr;
 
+    // 增加计数
     ++emitedCount;
 }
 
 // --------------------------------------- slots
+
+Slots::Slots()
+{
+    // pass
+}
 
 Slots::~Slots() {
     clear();
@@ -96,29 +104,54 @@ void Slots::add(Slots::slot_type s) {
     if (isblocked())
         return r;
 
-    for (auto iter = _slots.begin(); iter != _slots.end();)  {
-        auto &s = *iter;
-        if (s->count && (s->emitedCount >= s->count))
-            continue; // 激活数控制
+    // 保存一份快照
+    // 如果循环中存在对slots的修改，则采用:
+    // 1, 总循环和emit使用快照
+    // 2, 删除使用查找-》删除
 
+    slots_type snaps = _slots;
+    for (size_t idx = 0; idx < snaps.size(); ++idx)
+    {
+        auto &s = snaps[idx];
+        if (s->count && (s->emitedCount >= s->count))
+            continue; // 已经达到设置激活的数量
+        
         // 激发信号
         s->signal = signal;
         s->sender = owner;
         s->emit(d, t);
 
-        // 控制激活数
+        // 判断激活数是否达到设置
         if (s->count && s->emitedCount >= s->count) {
+            // 需要移除
             if (s->target)
                 r.insert(s->target);
-            iter = _slots.erase(iter);
-        }
-        else {
-            ++iter;
+            // 在_slots中查找删除
+            for (auto iter = _slots.begin(); iter != _slots.end();)
+            {
+                if (*iter == s) {
+                    iter = _slots.erase(iter);
+                }
+                else {
+                    ++iter;
+                }
+            }
         }
 
-        // 阻断
-        if (s->getVeto())
+        // 阻断，停止执行
+        if (s->getVeto()) {
             break;
+        }
+
+        if (!_signals->owner) {
+            // 如果运行过程中根对象已经析构，则停止执行
+            break;
+        }
+    }
+
+    if (!_signals->owner) {
+        // 返回空的列表，因为对象已经析构，会自动断开其他连接, 返回运行中断开的对象列表已经没有意义
+        r.clear();
     }
 
     return r;
@@ -180,35 +213,43 @@ bool Slots::disconnect(Slot::pfn_membercallback_type cb, Object *target) {
     return r;
 }
 
-Slots::slot_type Slots::find_connected_function(Slot::pfn_callback_type cb) {
-    auto fnd = ::std::find_if(_slots.begin(), _slots.end(), [=](slots_type::value_type &s) {
-        return s->_pfn_cb == cb;
-    });
-    return fnd == _slots.end() ? nullptr : *fnd;
+Slots::slot_type Slots::findByFunction(Slot::pfn_callback_type cb) const {
+    for (auto iter = _slots.begin(); iter != _slots.end(); ++iter) {
+        auto &s = *iter;
+        if (s->_pfn_cb == cb) {
+            return s;
+        }
+    }
+    return nullptr;
 }
 
-Slots::slot_type Slots::find_connected_function(Slot::pfn_membercallback_type cb, Object *target) {
-    auto fnd = ::std::find_if(_slots.begin(), _slots.end(), [=](slots_type::value_type &s) {
-        return s->_pfn_memcb == cb && s->target == target;
-    });
-    return fnd == _slots.end() ? nullptr : *fnd;
+Slots::slot_type Slots::findByFunction(Slot::pfn_membercallback_type cb, Object *target) const {
+    for (auto iter = _slots.begin(); iter != _slots.end(); ++iter) {
+        auto &s = *iter;
+        if (s->_pfn_memcb == cb && s->target == target) {
+            return s;
+        }
+    }
+    return nullptr;
 }
 
-Slots::slot_type Slots::find_redirected(signal_t const &sig, Object *target) {
-    auto fnd = ::std::find_if(_slots.begin(), _slots.end(), [=](slots_type::value_type &s) {
-        return s->redirect == sig && s->target == target;
-    });
-    return fnd == _slots.end() ? nullptr : *fnd;
-}
-
-bool Slots::is_connected(Object *target) const {
-    auto fnd = ::std::find_if(_slots.cbegin(), _slots.cend(), [=](slots_type::value_type const &s) {
-        return s->target == target;
-    });
-    return fnd != _slots.end();
+bool Slots::isConnected(Object *target) const {
+    for (auto iter = _slots.begin(); iter != _slots.end(); ++iter) {
+        auto &s = *iter;
+        if (s->target == target) {
+            return true;
+        }
+    }
+    return false;
 }
 
 // ---------------------------------------- signals
+
+Signals::Signals(Object* _owner)
+    : owner(_owner)
+{
+    // pass
+}
 
 Signals::~Signals() {
     clear();
@@ -238,6 +279,7 @@ bool Signals::registerr(signal_t const &sig) {
         return false;
 
     auto ss = ::std::make_shared<Slots>();
+    ss->_signals = this;
     ss->signal = sig;
     ss->owner = owner;
     _signals.insert(::std::make_pair(sig, ss));
@@ -253,7 +295,7 @@ Slots::slot_type Signals::connect(signal_t const &sig, Slot::pfn_callback_type c
     auto ss = fnd->second;
 
     // 判断是否已经连接
-    auto s = ss->find_connected_function(cb);
+    auto s = ss->findByFunction(cb);
     if (s)
         return s;
 
@@ -289,7 +331,7 @@ Slots::slot_type Signals::connect(signal_t const &sig, Slot::pfn_membercallback_
     auto ss = fnd->second;
 
     // 判断是否已经连接
-    auto s = ss->find_connected_function(cb, target);
+    auto s = ss->findByFunction(cb, target);
     if (s)
         return s;
 
@@ -299,12 +341,13 @@ Slots::slot_type Signals::connect(signal_t const &sig, Slot::pfn_membercallback_
     s->target = target;
     ss->add(s);
 
-    _inv_connect(target);
+    // 将连接到自己的对象添加到反向连接表中，当object释放或clear时，可以将对方连接的插槽自动断开，避免野指针
+    _inverseConnect(target);
 
     return s;
 }
 
-Slots::slot_type Signals::connect(signal_t const &sig, Slot::callback_type cb, Object *target, Slot::pfn_membercallback_type cbmem) {
+Slots::slot_type Signals::_connect(signal_t const &sig, Slot::callback_type cb, Object *target, Slot::pfn_membercallback_type cbmem) {
     auto fnd = _signals.find(sig);
     if (fnd == _signals.end()) {
         SS_LOG_WARN("对象信号 " + sig + " 不存在")
@@ -313,7 +356,7 @@ Slots::slot_type Signals::connect(signal_t const &sig, Slot::callback_type cb, O
     auto ss = fnd->second;
 
     // 判断是否已经连接
-    auto s = ss->find_connected_function(cbmem, target);
+    auto s = ss->findByFunction(cbmem, target);
     if (s)
         return s;
 
@@ -323,7 +366,7 @@ Slots::slot_type Signals::connect(signal_t const &sig, Slot::callback_type cb, O
     s->target = target;
     ss->add(s);
 
-    _inv_connect(target);
+    _inverseConnect(target);
 
     return s;
 }
@@ -331,29 +374,6 @@ Slots::slot_type Signals::connect(signal_t const &sig, Slot::callback_type cb, O
 bool Signals::isConnected(signal_t const &sig) const {
     auto fnd = _signals.find(sig);
     return fnd != _signals.end() && !fnd->second->_slots.empty();
-}
-
-Slots::slot_type Signals::redirect(signal_t const &sig, Object *target) {
-    return redirect(sig, sig, target);
-}
-
-Slots::slot_type Signals::redirect(signal_t const &sig1, signal_t const &sig2, Object *target) {
-    auto fnd = _signals.find(sig1);
-    if (fnd == _signals.end())
-        return nullptr;
-    auto &ss = fnd->second;
-    auto s = ss->find_redirected(sig2, target);
-    if (s)
-        return s;
-
-    s = ::std::make_shared<Slot>();
-    s->redirect = sig2;
-    s->target = target;
-    ss->add(s);
-
-    _inv_connect(target);
-
-    return s;
 }
 
 void Signals::emit(signal_t const &sig, Slot::data_type d, Slot::tunnel_type t) const {
@@ -366,13 +386,14 @@ void Signals::emit(signal_t const &sig, Slot::data_type d, Slot::tunnel_type t) 
         return;
     }
 
-    auto &ss = fnd->second;
-    auto targets = ss->emit(d, t);
+    // 使用快照避免owner析构 -> signals::clear -> 导致slots被释放
+    auto snaps = fnd->second;
+    auto targets = snaps->emit(d, t);
     if (!targets.empty()) {
         // 收集所有被移除的target，并断开反向连接
         for (auto &iter:targets) {
             if (!isConnectedOfTarget(iter)) {
-                _inv_disconnect(iter);
+                _inverseDisconnect(iter);
             }
         }
     }
@@ -386,8 +407,9 @@ void Signals::disconnectOfTarget(Object *target, bool inv) {
         iter.second->disconnect(nullptr, target);
     }
 
-    if (inv)
-        _inv_disconnect(target);
+    if (inv) {
+        _inverseDisconnect(target);
+    }
 }
 
 void Signals::disconnect(signal_t const &sig) {
@@ -409,8 +431,9 @@ void Signals::disconnect(signal_t const &sig, Slot::pfn_callback_type cb) {
         }
         ss->_slots.clear();
         for (auto &iter:targets) {
-            if (!isConnectedOfTarget(iter))
-                _inv_disconnect(iter);
+            if (!isConnectedOfTarget(iter)) {
+                _inverseDisconnect(iter);
+            }
         }
     } else {
         ss->disconnect(cb);
@@ -432,20 +455,21 @@ void Signals::disconnect(signal_t const &sig, Slot::pfn_membercallback_type cb, 
         }
         ss->_slots.clear();
         for (auto &iter:targets) {
-            if (!isConnectedOfTarget(iter))
-                _inv_disconnect(iter);
+            if (!isConnectedOfTarget(iter)) {
+                _inverseDisconnect(iter);
+            }
         }
     } else {
         // 先清除对应的slot，再判断是否存在和target相连的插槽，如过不存在，则断开反向连接
         if (ss->disconnect(cb, target) && target && !isConnectedOfTarget(target)) {
-            _inv_disconnect(target);
+            _inverseDisconnect(target);
         }
     }
 }
 
 bool Signals::isConnectedOfTarget(Object *target) const {
     for (auto iter = _signals.cbegin(); iter != _signals.end(); ++iter) {
-        if (iter->second->is_connected(target)) {
+        if (iter->second->isConnected(target)) {
             return true;
         }
     }
@@ -469,7 +493,7 @@ bool Signals::isblocked(signal_t const &sig) const {
     return fnd != _signals.end() ? fnd->second->isblocked() : false;
 }
 
-void Signals::_inv_connect(Object *target) {
+void Signals::_inverseConnect(Object *target) {
     if (target == nullptr)
         return;
     if (&target->signals() == this)
@@ -477,7 +501,7 @@ void Signals::_inv_connect(Object *target) {
     target->signals()._invs.insert(this);
 }
 
-void Signals::_inv_disconnect(Object *target) const {
+void Signals::_inverseDisconnect(Object *target) const {
     if (target == nullptr)
         return;
     if (&target->signals() == this)

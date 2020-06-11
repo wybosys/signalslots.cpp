@@ -71,16 +71,19 @@ private:
 // 用于穿透整个emit流程的对象
 struct Tunnel {
 
-    /** 是否请求中断了emit过程 */
+    // 是否请求中断了emit过程
     bool veto;
 
-    /** 附加数据 */
+    // 附加数据
     ::std::shared_ptr<::COMXX_NS::Variant<> > payload;
 };
 
 // 插槽对象
 class Slot {
 public:
+
+    Slot();
+    ~Slot();
 
     typedef void (*pfn_callback_type)(Slot &);
 
@@ -93,47 +96,41 @@ public:
     typedef ::std::shared_ptr<::COMXX_NS::Variant<> > payload_type;
     typedef payload_type data_type;
 
-    /** 重定向的信号 */
-    signal_t redirect;
-
     // 通用回调对象
     callback_type cb;
 
-    /** 回调的上下文 */
+    // 回调函数归属的对象
     attach_ptr<Object> target;
 
-    /** 激发者 */
+    // 激发对象
     attach_ptr<Object> sender;
 
-    /** 数据 */
+    // 携带数据
     data_type data;
 
-    /** 延迟s启动 */
-    // seconds_t delay = 0;
-
-    /** 穿透用的数据 */
+    // 穿透整个调用流程的数据
     tunnel_type tunnel;
 
-    /** connect 时附加的数据 */
+    // connect 时附加的数据
     payload_type payload;
 
-    /** 信号源 */
+    // 信号源名称
     signal_t signal;
 
-    /** 激发频率限制 (emits per second) */
+    // 激发频率限制 (emits per second)
     unsigned short eps = 0;
 
-    /** 是否中断掉信号调用树 */
+    // 是否中断掉信号调用树
     bool getVeto() const;
 
+    // 设置中断信号调用
     void setVeto(bool b);
 
-    /** 调用几次自动解绑，默认为 null，不使用概设定 */
+    // 调用几次自动解绑，默认为 null，不使用概设定
     size_t count = 0;
     size_t emitedCount = 0;
 
-    /** 激发信号
-     @data 附带的数据，激发后自动解除引用 */
+    // 激发信号 @data 附带的数据，激发后自动解除引用
     void emit(data_type data, tunnel_type tunnel);
 
 protected:
@@ -149,55 +146,59 @@ protected:
 private:
 
     double _epstm = 0;
-    bool _veto;
+    bool _veto = false;
 
     friend class Slots;
-
     friend class Signals;
 };
 
+// 插槽集合
 class Slots {
 public:
 
-    typedef ::std::shared_ptr<Slot> slot_type;
-
+    Slots();
     ~Slots();
+
+    typedef ::std::shared_ptr<Slot> slot_type;
 
     // 所有者，会传递到 Slot 的 sender
     attach_ptr<Object> owner;
 
-    // 信号源
+    // 信号源名称
     signal_t signal;
 
-    /** 清空连接 */
+    // 清空连接
     void clear();
 
+    // 阻塞所有插槽
     void block();
 
+    // 解阻
     void unblock();
 
-    /** 是否已经阻塞 */
+    // 是否已经阻塞
     bool isblocked() const;
 
-    /** 添加一个插槽 */
+    // 添加一个插槽
     void add(slot_type s);
 
-    /** 对所有插槽激发信号
-     * @note 返回被移除的插槽的对象
-     */
+    // 对所有插槽激发信号 @note 返回被移除的插槽的对象
     ::std::set<Object *> emit(Slot::data_type data, Slot::tunnel_type tunnel);
 
+    // 移除
     bool disconnect(Slot::pfn_callback_type cb);
 
+    // 移除
     bool disconnect(Slot::pfn_membercallback_type cb, Object *target);
 
-    slot_type find_connected_function(Slot::pfn_callback_type cb);
+    // 查找插槽
+    slot_type findByFunction(Slot::pfn_callback_type cb) const;
 
-    slot_type find_connected_function(Slot::pfn_membercallback_type cb, Object *target);
+    // 查找插槽
+    slot_type findByFunction(Slot::pfn_membercallback_type cb, Object *target) const;
 
-    slot_type find_redirected(signal_t const &sig, Object *target);
-
-    bool is_connected(Object *target) const;
+    // 是否已经连接
+    bool isConnected(Object *target) const;
 
 private:
 
@@ -206,37 +207,36 @@ private:
     // 保存所有插槽
     slots_type _slots;
 
-    /** 阻塞信号
-     * @note emit被阻塞的信号将不会有任何作用
-     */
+    // 阻塞信号计数器 @note emit被阻塞的信号将不会有任何作用
     int _blk = 0;
+
+    // 隶属的signals
+    attach_ptr<Signals> _signals;
 
     friend class Signals;
 };
 
+// 信号主类
 class Signals {
 public:
 
-    typedef ::std::shared_ptr<Slots> slots_type;
-
-    explicit Signals(Object* owner)
-        : owner(owner)
-    {
-        // pass
-    }
+    // 信号必须依赖一个object，使得插槽可以实现为成员函数
+    explicit Signals(Object* owner);
     
     ~Signals();
+
+    typedef ::std::shared_ptr<Slots> slots_type;
 
     // 清空
     void clear();
 
-    /** 注册信号 */
+    // 注册信号
     bool registerr(signal_t const &sig);
 
     // 信号的主体
     attach_ptr<Object> owner;
 
-    /** 只连接一次 */
+    // 只连接一次，调用后自动断开
     Slots::slot_type once(signal_t const &sig, Slot::callback_type cb);
 
     Slots::slot_type once(signal_t const &sig, Slot::pfn_callback_type cb);
@@ -246,7 +246,7 @@ public:
     template<typename C>
     Slots::slot_type once(signal_t const &sig, void (C::*cb)(Slot &), C *target);
 
-    /** 连接信号插槽 */
+    // 连接信号插槽
     Slots::slot_type connect(signal_t const &sig, Slot::callback_type cb);
 
     Slots::slot_type connect(signal_t const &sig, Slot::pfn_callback_type cb);
@@ -256,23 +256,13 @@ public:
     template<typename C>
     Slots::slot_type connect(signal_t const &sig, void (C::*cb)(Slot &), C *target);
 
-    /** 该信号是否存在连接上的插槽 */
+    // 该信号是否存在连接上的插槽
     bool isConnected(signal_t const &sig) const;
 
-    /** 转发一个信号到另一个对象的信号 */
-    Slots::slot_type redirect(signal_t const &sig1, signal_t const &sig2, Object *target);
-
-    Slots::slot_type redirect(signal_t const &sig, Object *target);
-
-    /** 激发信号 */
+    // 激发信号
     void emit(signal_t const& sig, Slot::data_type data = nullptr, Slot::tunnel_type tunnel = nullptr) const;
 
-    /** 向外抛出信号
-     * @note 为了解决诸如金币变更、元宝变更等大部分同时发生的事件但是因为set的时候不能把这些的修改函数合并成1个函数处理，造成同一个消息短时间多次激活，所以使用该函数可以在下一帧开始后归并发出唯一的事件。所以该函数出了信号外不支持其他带参
-     */
-    // void cast(signal_t const &sig);
-
-    /** 断开连接 */
+    // 断开连接
     void disconnectOfTarget(Object *target, bool inv = true);
 
     void disconnect(signal_t const &sig);
@@ -283,32 +273,33 @@ public:
 
     bool isConnectedOfTarget(Object *target) const;
 
-    /** 阻塞一个信号，将不响应激发 */
+    // 阻塞一个信号，将不响应激发
     void block(signal_t const &sig);
 
+    // 解阻
     void unblock(signal_t const &sig);
 
+    // 是否阻塞
     bool isblocked(signal_t const &sig) const;
 
 protected:
 
-    // void _doCastings();
-
-    Slots::slot_type connect(signal_t const &sig, Slot::callback_type cb, Object *target, Slot::pfn_membercallback_type cbmem);
+    // 实现连接
+    Slots::slot_type _connect(signal_t const &sig, Slot::callback_type cb, Object *target, Slot::pfn_membercallback_type cbmem);
 
 private:
 
-    void _inv_connect(Object *target);
-
-    void _inv_disconnect(Object* target) const;
-
     // 反向登记，当自身 dispose 时，需要和对方断开
+    void _inverseConnect(Object *target);
+
+    void _inverseDisconnect(Object* target) const;
+
+    // 保存连接到自身信号的对象信号，用于反向断开
     ::std::set<Signals *> _invs;
 
+    // 保存所有的信号和插槽列表
     typedef ::std::map<signal_t, slots_type> signals_type;
     signals_type _signals;
-
-    // ::std::set<signal_t> _castings;
 };
 
 template<typename C>
@@ -321,9 +312,10 @@ inline Slots::slot_type Signals::once(signal_t const &sig, void (C::*cb)(Slot &)
 
 template<typename C>
 inline Slots::slot_type Signals::connect(signal_t const &sig, void (C::*cb)(Slot &), C *target) {
-    return connect(sig, ::std::bind(cb, target, ::std::placeholders::_1), target, (Slot::pfn_membercallback_type)cb);
+    return _connect(sig, ::std::bind(cb, target, ::std::placeholders::_1), target, (Slot::pfn_membercallback_type)cb);
 }
 
+// 基础对象，用于实现成员函数插槽
 class Object {
 public:
 
@@ -350,6 +342,8 @@ public:
     }
 
 private:
+
+    // 实现为shared指针，以用于emit时可以临时保护，避免直接被释放导致野指针
     ::std::shared_ptr<Signals> _s;
     friend class Signals;
 };
