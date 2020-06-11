@@ -354,7 +354,7 @@ private:
     friend class Signals;
 };
 
-#define SS_SIGNAL(sig) static const Ss::signal_t sig;
-#define SS_SIGNAL_IMPL(sig, val) const ::Ss::signal_t sig = val;
+#define SS_SIGNAL(sig) static const ::SS_NS::signal_t sig;
+#define SS_SIGNAL_IMPL(sig, val) const ::SS_NS::signal_t sig = val;
 
 SS_END
