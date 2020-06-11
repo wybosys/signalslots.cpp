@@ -51,9 +51,7 @@ template<typename Types = VariantTypes<> >
 class Variant {
 public:
 
-    typedef ::std::function<Variant(::std::initializer_list<Variant> const &)>
-    func_type;
-
+    typedef void (*func_type)();
     typedef typename Types::object_type object_type;
     typedef typename Types::bytes_type bytes_type;
     typedef typename Types::string_type string_type;
@@ -120,7 +118,7 @@ public:
 
     Variant(char const *);
 
-    Variant(func_type const &);
+    Variant(func_type);
 
     Variant(Variant const &);
 
@@ -164,7 +162,7 @@ public:
 
     ::std::string const &toString() const;
 
-    func_type const &toFunction() const;
+    func_type toFunction() const;
 
     Variant &operator=(Variant const &);
 
@@ -185,11 +183,11 @@ private:
         char c;
         unsigned char uc;
         bool b;
+        func_type fn;
     } _pod;
 
     ::std::shared_ptr<bytes_type> _bytes;
     ::std::shared_ptr<string_type> _str;
-    ::std::shared_ptr<func_type> _func;
 };
 
 template <typename V>
@@ -388,14 +386,13 @@ template<typename Types>
 inline Variant<Types>::Variant(char const *v) : vt(VT::STRING) { _str = ::std::make_shared<string_type>(v); }
 
 template<typename Types>
-inline Variant<Types>::Variant(func_type const &v) : vt(VT::FUNCTION) { _func = ::std::make_shared<func_type>(v); }
+inline Variant<Types>::Variant(func_type v) : vt(VT::FUNCTION) { _pod.fn = v; }
 
 template<typename Types>
 inline Variant<Types>::Variant(Variant const &r) : vt(r.vt) {
     _pod = r._pod;
     _bytes = r._bytes;
     _str = r._str;
-    _func = r._func;
     if (r.vt == VT::OBJECT && _pod.o) {
         grab(_pod.o);
     }
@@ -406,7 +403,6 @@ inline Variant<Types>::Variant(::std::shared_ptr<Variant> const &r) : vt(r->vt) 
     _pod = r->_pod;
     _bytes = r->_bytes;
     _str = r->_str;
-    _func = r->_func;
     if (r->vt == VT::OBJECT && _pod.o) {
         grab(_pod.o);
     }
@@ -419,6 +415,69 @@ inline Variant<Types>::~Variant() {
         _pod.o = nullptr;
     }
 }
+
+template <typename TVar = Variant<>, typename TReturn = TVar, typename TArg = TVar const&>
+class FunctionTypes
+{
+public:
+    typedef TVar variant_type;
+    typedef TReturn return_type;
+    typedef TArg arg_type;
+};
+
+// 泛函数对象内存单一包裹结构
+template <typename Types = FunctionTypes<> >
+class Function
+{
+public:
+
+    typedef typename Types::variant_type variant_type;
+    typedef typename Types::return_type return_type;
+    typedef typename Types::arg_type arg_type;
+
+    typedef ::std::function<return_type()> fun0_type;
+    typedef ::std::function<return_type(arg_type const&)> fun1_type;
+    typedef ::std::function<return_type(arg_type const&, arg_type const&)> fun2_type;
+    typedef ::std::function<return_type(arg_type const&, arg_type const&, arg_type const&)> fun3_type;
+    typedef ::std::function<return_type(arg_type const&, arg_type const&, arg_type const&, arg_type const&)> fun4_type;
+    typedef ::std::function<return_type(arg_type const&, arg_type const&, arg_type const&, arg_type const&, arg_type const&)> fun5_type;
+    typedef ::std::function<return_type(arg_type const&, arg_type const&, arg_type const&, arg_type const&, arg_type const&, arg_type const&)> fun6_type;
+    typedef ::std::function<return_type(arg_type const&, arg_type const&, arg_type const&, arg_type const&, arg_type const&, arg_type const&, arg_type const&)> fun7_type;
+    typedef ::std::function<return_type(arg_type const&, arg_type const&, arg_type const&, arg_type const&, arg_type const&, arg_type const&, arg_type const&, arg_type const&)> fun8_type;
+    typedef ::std::function<return_type(arg_type const&, arg_type const&, arg_type const&, arg_type const&, arg_type const&, arg_type const&, arg_type const&, arg_type const&, arg_type const&)> fun9_type;
+
+    Function() = default;
+    Function(fun0_type fn);
+    Function(fun1_type fn);
+    Function(fun2_type fn);
+    Function(fun3_type fn);
+    Function(fun4_type fn);
+    Function(fun5_type fn);
+    Function(fun6_type fn);
+    Function(fun7_type fn);
+    Function(fun8_type fn);
+    Function(fun9_type fn);
+
+    ~Function();
+
+    return_type operator ()() const;
+    return_type operator ()(arg_type const&) const;
+    return_type operator ()(arg_type const&, arg_type const&) const;
+    return_type operator ()(arg_type const&, arg_type const&, arg_type const&) const;
+    return_type operator ()(arg_type const&, arg_type const&, arg_type const&, arg_type const&) const;
+    return_type operator ()(arg_type const&, arg_type const&, arg_type const&, arg_type const&, arg_type const&) const;
+    return_type operator ()(arg_type const&, arg_type const&, arg_type const&, arg_type const&, arg_type const&, arg_type const&) const;
+    return_type operator ()(arg_type const&, arg_type const&, arg_type const&, arg_type const&, arg_type const&, arg_type const&, arg_type const&) const;
+    return_type operator ()(arg_type const&, arg_type const&, arg_type const&, arg_type const&, arg_type const&, arg_type const&, arg_type const&, arg_type const&) const;
+    return_type operator ()(arg_type const&, arg_type const&, arg_type const&, arg_type const&, arg_type const&, arg_type const&, arg_type const&, arg_type const&, arg_type const&) const;
+
+    operator bool () const;
+
+private:
+
+    unsigned char _count = 0;
+    void* _mem = nullptr;
+};
 
 template<typename Types>
 inline typename Variant<Types>::object_type *Variant<Types>::toObject() const { return _pod.o; }
@@ -472,14 +531,13 @@ template<typename Types>
 inline ::std::string const &Variant<Types>::toString() const { return *_str; }
 
 template<typename Types>
-inline typename Variant<Types>::func_type const &Variant<Types>::toFunction() const { return *_func; }
+inline typename Variant<Types>::func_type Variant<Types>::toFunction() const { return _pod.fn; }
 
 template<typename Types>
 inline Variant<Types> &Variant<Types>::operator=(Variant const &r) {
     if (this != &r) {
         _bytes = r._bytes;
         _str = r._str;
-        _func = r._func;
 
         object_type *old = nullptr;
         if (vt == VT::OBJECT && _pod.o) {
@@ -638,21 +696,13 @@ struct function_call<F, N> { \
 };
 
 COMXX_FUNCTION_CALL(1, COMXX_PPARGS_1(args))
-
 COMXX_FUNCTION_CALL(2, COMXX_PPARGS_2(args))
-
 COMXX_FUNCTION_CALL(3, COMXX_PPARGS_3(args))
-
 COMXX_FUNCTION_CALL(4, COMXX_PPARGS_4(args))
-
 COMXX_FUNCTION_CALL(5, COMXX_PPARGS_5(args))
-
 COMXX_FUNCTION_CALL(6, COMXX_PPARGS_6(args))
-
 COMXX_FUNCTION_CALL(7, COMXX_PPARGS_7(args))
-
 COMXX_FUNCTION_CALL(8, COMXX_PPARGS_8(args))
-
 COMXX_FUNCTION_CALL(9, COMXX_PPARGS_9(args))
 
 
@@ -660,6 +710,122 @@ COMXX_FUNCTION_CALL(9, COMXX_PPARGS_9(args))
 add(idd, #name, [&](COMXX_NS::args_t const& args)->COMXX_NS::Variant { \
 return COMXX_NS::function_call<decltype(&func)>()(&func, this, args); \
     })
+
+#define _COMXX_FUNCTION_IMPL(num) \
+template <typename Types> \
+inline Function<Types>::Function(fun##num##_type fn) \
+: _count(num), _mem(new fun##num##_type(fn)) \
+{}
+
+_COMXX_FUNCTION_IMPL(0)
+_COMXX_FUNCTION_IMPL(1)
+_COMXX_FUNCTION_IMPL(2)
+_COMXX_FUNCTION_IMPL(3)
+_COMXX_FUNCTION_IMPL(4)
+_COMXX_FUNCTION_IMPL(5)
+_COMXX_FUNCTION_IMPL(6)
+_COMXX_FUNCTION_IMPL(7)
+_COMXX_FUNCTION_IMPL(8)
+_COMXX_FUNCTION_IMPL(9)
+
+template <typename Types>
+inline Function<Types>::~Function()
+{
+#define _COMXX_FUNCTION_FREE(num) \
+case num: delete (fun##num##_type*)_mem; break;
+    switch (_count) {
+        _COMXX_FUNCTION_FREE(0)
+        _COMXX_FUNCTION_FREE(1)
+        _COMXX_FUNCTION_FREE(2)
+        _COMXX_FUNCTION_FREE(3)
+        _COMXX_FUNCTION_FREE(4)
+        _COMXX_FUNCTION_FREE(5)
+        _COMXX_FUNCTION_FREE(6)
+        _COMXX_FUNCTION_FREE(7)
+        _COMXX_FUNCTION_FREE(8)
+        _COMXX_FUNCTION_FREE(9)
+    }
+}
+
+template <typename Types>
+inline Function<Types>::operator bool() const {
+    if (!_mem)
+        return false;
+#define _COMXX_FUNCTION_NOTEMPTY(num) \
+        case num: return !!*((fun##num##_type*)_mem);
+    switch (_count) {
+        _COMXX_FUNCTION_NOTEMPTY(0)
+        _COMXX_FUNCTION_NOTEMPTY(1)
+        _COMXX_FUNCTION_NOTEMPTY(2)
+        _COMXX_FUNCTION_NOTEMPTY(3)
+        _COMXX_FUNCTION_NOTEMPTY(4)
+        _COMXX_FUNCTION_NOTEMPTY(5)
+        _COMXX_FUNCTION_NOTEMPTY(6)
+        _COMXX_FUNCTION_NOTEMPTY(7)
+        _COMXX_FUNCTION_NOTEMPTY(8)
+        _COMXX_FUNCTION_NOTEMPTY(9)
+    }
+}
+
+template <typename Types>
+inline typename Function<Types>::return_type Function<Types>::operator()() const {
+    assert(_count == 0);
+    return (*(fun0_type*)_mem)();
+}
+
+template <typename Types>
+inline typename Function<Types>::return_type Function<Types>::operator()(arg_type const& v0) const {
+    assert(_count == 1);
+    return (*(fun1_type*)_mem)(v0);
+}
+
+template <typename Types>
+inline typename Function<Types>::return_type Function<Types>::operator()(arg_type const& v0, arg_type const& v1) const {
+    assert(_count == 2);
+    return (*(fun2_type*)_mem)(v0, v1);
+}
+
+template <typename Types>
+inline typename Function<Types>::return_type Function<Types>::operator()(arg_type const& v0, arg_type const& v1, arg_type const& v2) const {
+    assert(_count == 3);
+    return (*(fun3_type*)_mem)(v0, v1, v2);
+}
+
+template <typename Types>
+inline typename Function<Types>::return_type Function<Types>::operator()(arg_type const& v0, arg_type const& v1, arg_type const& v2, arg_type const& v3) const {
+    assert(_count == 4);
+    return (*(fun4_type*)_mem)(v0, v1, v2, v3);
+}
+
+template <typename Types>
+inline typename Function<Types>::return_type Function<Types>::operator()(arg_type const& v0, arg_type const& v1, arg_type const& v2, arg_type const& v3, arg_type const& v4) const {
+    assert(_count == 5);
+    return (*(fun5_type*)_mem)(v0, v1, v2, v3, v4);
+}
+
+template <typename Types>
+inline typename Function<Types>::return_type Function<Types>::operator()(arg_type const& v0, arg_type const& v1, arg_type const& v2, arg_type const& v3, arg_type const& v4, arg_type const& v5) const {
+    assert(_count == 6);
+    return (*(fun6_type*)_mem)(v0, v1, v2, v3, v4, v5);
+}
+
+template <typename Types>
+inline typename Function<Types>::return_type Function<Types>::operator()(arg_type const& v0, arg_type const& v1, arg_type const& v2, arg_type const& v3, arg_type const& v4, arg_type const& v5, arg_type const& v6) const {
+    assert(_count == 7);
+    return (*(fun7_type*)_mem)(v0, v1, v2, v3, v4, v5, v6);
+}
+
+template <typename Types>
+inline typename Function<Types>::return_type Function<Types>::operator()(arg_type const& v0, arg_type const& v1, arg_type const& v2, arg_type const& v3, arg_type const& v4, arg_type const& v5, arg_type const& v6, arg_type const& v7) const {
+    assert(_count == 8);
+    return (*(fun8_type*)_mem)(v0, v1, v2, v3, v4, v5, v6, v7);
+}
+
+template <typename Types>
+inline typename Function<Types>::return_type Function<Types>::operator()(arg_type const& v0, arg_type const& v1, arg_type const& v2, arg_type const& v3, arg_type const& v4, arg_type const& v5, arg_type const& v6, arg_type const& v7, arg_type const& v8) const {
+    assert(_count == 9);
+    return (*(fun9_type*)_mem)(v0, v1, v2, v3, v4, v5, v6, v7, v8);
+}
 
 COMXX_END
 
