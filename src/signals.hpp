@@ -200,6 +200,9 @@ public:
     // 是否已经连接
     bool isConnected(Object *target) const;
 
+    // 已经连接的插槽数量
+    size_t size() const;
+
 private:
 
     typedef ::std::vector<slot_type> slots_type;
@@ -232,6 +235,9 @@ public:
 
     // 注册信号
     bool registerr(signal_t const &sig);
+
+    // 返回指定信号的所有插槽
+    slots_type find(signal_t const&) const;
 
     // 信号的主体
     attach_ptr<Object> owner;

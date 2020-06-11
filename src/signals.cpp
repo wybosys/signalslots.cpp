@@ -127,13 +127,11 @@ void Slots::add(Slots::slot_type s) {
             if (s->target)
                 r.insert(s->target);
             // 在_slots中查找删除
-            for (auto iter = _slots.begin(); iter != _slots.end();)
+            for (auto iter = _slots.begin(); iter != _slots.end(); ++iter)
             {
                 if (*iter == s) {
                     iter = _slots.erase(iter);
-                }
-                else {
-                    ++iter;
+                    break; // 找到即删除
                 }
             }
         }
@@ -243,6 +241,10 @@ bool Slots::isConnected(Object *target) const {
     return false;
 }
 
+size_t Slots::size() const {
+    return _slots.size();
+}
+
 // ---------------------------------------- signals
 
 Signals::Signals(Object* _owner)
@@ -284,6 +286,11 @@ bool Signals::registerr(signal_t const &sig) {
     ss->owner = owner;
     _signals.insert(::std::make_pair(sig, ss));
     return true;
+}
+
+Signals::slots_type Signals::find(signal_t const& s) const {
+    auto fnd = _signals.find(s);
+    return fnd == _signals.end() ? nullptr : fnd->second;
 }
 
 Slots::slot_type Signals::connect(signal_t const &sig, Slot::pfn_callback_type cb) {

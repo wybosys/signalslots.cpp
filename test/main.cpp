@@ -64,18 +64,51 @@ void test1()
     // 测试发出信号后删除自身
     auto tmp = new A();
     tmp->signals().registerr("a");
+    tmp->signals().registerr("b");
     tmp->signals().connect("a", [&](Slot &s) {
-        delete tmp;
-        });
+        // delete tmp;
+        tmp->signals().connect("b", [&](Slot &s) {
+            delete tmp;
+            });
+        });    
     tmp->signals().connect("a", [&](Slot &s) {
-        // 不应被调用，因为在上面已经析构
-        tmp->test();
+        tmp->signals().emit("b");
         });
     tmp->signals().emit("a");
 }
 
+void test2()
+{
+    A a;
+    a.signals().registerr("a");
+    a.signals().once("a", [&](Slot&s) {});
+    a.signals().once("a", [&](Slot&s) {});
+    a.signals().once("a", [&](Slot&s) {});
+    a.signals().once("a", [&](Slot&s) {});
+    a.signals().once("a", [&](Slot&s) {});
+    a.signals().once("a", [&](Slot&s) {});
+    a.signals().emit("a");
+    if (a.signals().find("a")->size() != 0) {
+        cerr << "按照次数进行连接的模块存在bug" << endl;
+    }
+}
+
+void test3()
+{
+    // 测试对象之间的反向断开，不应输出任何东西
+    A a;
+    a.signals().registerr("a");
+    {
+        B b;
+        a.signals().connect("a", &B::proc, &b);
+    }
+    a.signals().emit("a");
+}
+
 int main() {
     // test0();
-    test1();
+    // test1();
+    // test2();
+    test3();
     return 0;
 }
