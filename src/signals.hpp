@@ -4,7 +4,7 @@
 
 #include "com++.hpp"
 
-#define SS_NS Ss
+#define SS_NS ss
 #define SS_BEGIN namespace SS_NS {
 #define SS_END }
 #define USE_SS using namespace SS_NS;
