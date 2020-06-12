@@ -217,7 +217,7 @@ public:
 
     virtual ~IObject() = default;
 
-    virtual void grab() const;
+    virtual IObject* grab() const;
 
     virtual bool drop() const;
 
@@ -232,12 +232,12 @@ class shared_ref {
 public:
     shared_ref(T *obj) : _ptr(obj) {
         if (_ptr)
-            _ptr->grab();
+            _ptr = _ptr->grab();
     }
 
     shared_ref(shared_ref const &r) : _ptr(r._ptr) {
         if (_ptr)
-            _ptr->grab();
+            _ptr = _ptr->grab();
     }
 
     ~shared_ref() {
@@ -306,26 +306,27 @@ private:
 };
 
 template<typename T>
-inline void grab(T *v) {}
+inline T grab(T v);
 
 template<>
-inline void grab<IObject>(IObject *v) {
-    v->grab();
+inline IObject* grab<IObject*>(IObject *v) {
+    return v->grab();
 }
 
 template<typename T>
-inline bool drop(T *v) { return false; }
+inline bool drop(T v);
 
 template<>
-inline bool drop<IObject>(IObject *v) {
+inline bool drop<IObject*>(IObject *v) {
     return v->drop();
 }
 
 template<typename Types>
 inline Variant<Types>::Variant(object_type *v) : vt(VT::OBJECT) {
     _pod.o = v;
-    if (v)
-        grab(v);
+    if (_pod.o) {
+        _pod.o = grab(_pod.o);
+    }
 }
 
 template<typename Types>
@@ -394,7 +395,7 @@ inline Variant<Types>::Variant(Variant const &r) : vt(r.vt) {
     _bytes = r._bytes;
     _str = r._str;
     if (r.vt == VT::OBJECT && _pod.o) {
-        grab(_pod.o);
+        _pod.o = grab(_pod.o);
     }
 }
 
@@ -404,7 +405,7 @@ inline Variant<Types>::Variant(::std::shared_ptr<Variant> const &r) : vt(r->vt) 
     _bytes = r->_bytes;
     _str = r->_str;
     if (r->vt == VT::OBJECT && _pod.o) {
-        grab(_pod.o);
+        _pod.o = grab(_pod.o);
     }
 }
 
@@ -546,7 +547,7 @@ inline Variant<Types> &Variant<Types>::operator=(Variant const &r) {
         const_cast<VT &>(vt) = r.vt;
         _pod = r._pod;
         if (vt == VT::OBJECT && _pod.o) {
-            grab(_pod.o);
+            _pod.o = grab(_pod.o);
         }
         if (old) {
             drop(old);
@@ -555,8 +556,9 @@ inline Variant<Types> &Variant<Types>::operator=(Variant const &r) {
     return *this;
 }
 
-inline void IObject::grab() const {
+inline IObject* IObject::grab() const {
     _referencedCount += 1;
+    return const_cast<IObject*>(this);
 }
 
 inline bool IObject::drop() const {
@@ -605,8 +607,7 @@ inline void CustomObject::add(IID const &iid, IObject *obj) {
         fnd->second->drop();
     }
 
-    obj->grab();
-    _objects[iid] = obj;
+    _objects[iid] = obj->grab();
 }
 
 inline void CustomObject::add(IID const &iid, ::std::string const &name, variant_type::func_type func) {
