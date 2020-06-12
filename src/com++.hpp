@@ -196,19 +196,18 @@ static ::std::shared_ptr<Variant<> > _V(V const& v) {
     return ::std::make_shared<Variant<> >(v);
 }
 
-typedef ::std::initializer_list<Variant<> > args_t;
+typedef ::std::initializer_list<Variant<> const*> args_t;
 
-#define COMXX_PPARGS_0(args)
-#define COMXX_PPARGS_1(args) *args.begin()
-#define COMXX_PPARGS_2(args) COMXX_PPARGS_1(args), *(args.begin() + 1)
-#define COMXX_PPARGS_3(args) COMXX_PPARGS_2(args), *(args.begin() + 2)
-#define COMXX_PPARGS_4(args) COMXX_PPARGS_3(args), *(args.begin() + 3)
-#define COMXX_PPARGS_5(args) COMXX_PPARGS_4(args), *(args.begin() + 4)
-#define COMXX_PPARGS_6(args) COMXX_PPARGS_5(args), *(args.begin() + 5)
-#define COMXX_PPARGS_7(args) COMXX_PPARGS_6(args), *(args.begin() + 6)
-#define COMXX_PPARGS_8(args) COMXX_PPARGS_7(args), *(args.begin() + 7)
-#define COMXX_PPARGS_9(args) COMXX_PPARGS_8(args), *(args.begin() + 8)
-#define COMXX_PPARGS_10(args) COMXX_PPARGS_9(args), *(args.begin() + 9)
+#define COMXX_PPARGS_0(pre, args)
+#define COMXX_PPARGS_1(pre, args) pre(args.begin())
+#define COMXX_PPARGS_2(pre, args) COMXX_PPARGS_1(pre, args), pre(args.begin() + 1)
+#define COMXX_PPARGS_3(pre, args) COMXX_PPARGS_2(pre, args), pre(args.begin() + 2)
+#define COMXX_PPARGS_4(pre, args) COMXX_PPARGS_3(pre, args), pre(args.begin() + 3)
+#define COMXX_PPARGS_5(pre, args) COMXX_PPARGS_4(pre, args), pre(args.begin() + 4)
+#define COMXX_PPARGS_6(pre, args) COMXX_PPARGS_5(pre, args), pre(args.begin() + 5)
+#define COMXX_PPARGS_7(pre, args) COMXX_PPARGS_6(pre, args), pre(args.begin() + 6)
+#define COMXX_PPARGS_8(pre, args) COMXX_PPARGS_7(pre, args), pre(args.begin() + 7)
+#define COMXX_PPARGS_9(pre, args) COMXX_PPARGS_8(pre, args), pre(args.begin() + 8)
 
 class IObject {
 public:
@@ -696,15 +695,15 @@ struct function_call<F, N> { \
     } \
 };
 
-COMXX_FUNCTION_CALL(1, COMXX_PPARGS_1(args))
-COMXX_FUNCTION_CALL(2, COMXX_PPARGS_2(args))
-COMXX_FUNCTION_CALL(3, COMXX_PPARGS_3(args))
-COMXX_FUNCTION_CALL(4, COMXX_PPARGS_4(args))
-COMXX_FUNCTION_CALL(5, COMXX_PPARGS_5(args))
-COMXX_FUNCTION_CALL(6, COMXX_PPARGS_6(args))
-COMXX_FUNCTION_CALL(7, COMXX_PPARGS_7(args))
-COMXX_FUNCTION_CALL(8, COMXX_PPARGS_8(args))
-COMXX_FUNCTION_CALL(9, COMXX_PPARGS_9(args))
+COMXX_FUNCTION_CALL(1, COMXX_PPARGS_1(**, args))
+COMXX_FUNCTION_CALL(2, COMXX_PPARGS_2(**, args))
+COMXX_FUNCTION_CALL(3, COMXX_PPARGS_3(**, args))
+COMXX_FUNCTION_CALL(4, COMXX_PPARGS_4(**, args))
+COMXX_FUNCTION_CALL(5, COMXX_PPARGS_5(**, args))
+COMXX_FUNCTION_CALL(6, COMXX_PPARGS_6(**, args))
+COMXX_FUNCTION_CALL(7, COMXX_PPARGS_7(**, args))
+COMXX_FUNCTION_CALL(8, COMXX_PPARGS_8(**, args))
+COMXX_FUNCTION_CALL(9, COMXX_PPARGS_9(**, args))
 
 
 #define COMXX_CUSTOMOBJECT_ADD(idd, name, func) \
