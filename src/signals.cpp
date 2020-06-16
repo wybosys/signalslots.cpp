@@ -255,18 +255,27 @@ Signals::Signals(Object* _owner)
 
 Signals::~Signals() {
     clear();
+    owner = nullptr;
 }
 
 void Signals::clear() {
     // 清空反向的连接
-    for (auto &iter:_invs) {
-        iter->owner->signals().disconnectOfTarget(owner, false);
+    for (auto &iter: _inverses) {
+        if (iter->owner && iter->owner != owner) {
+            iter->owner->signals().disconnectOfTarget(owner);
+        }
     }
-    _invs.clear();
+    _inverses.clear();
 
     // 清空slot的连接
-    for (auto const &iter: _signals) {
-        iter.second->clear();
+    for (auto &iter: _signals) {
+        auto& ss = iter.second;
+        for (auto& iter : ss->_slots) {
+            if (iter->target && iter->target != owner) {
+                disconnect(iter->signal, iter->_pfn_memcb, iter->target);
+            }
+        }
+        ss->clear();
     }
     _signals.clear();
 }
@@ -348,8 +357,11 @@ Slots::slot_type Signals::connect(signal_t const &sig, Slot::pfn_membercallback_
     s->target = target;
     ss->add(s);
 
-    // 将连接到自己的对象添加到反向连接表中，当object释放或clear时，可以将对方连接的插槽自动断开，避免野指针
-    _inverseConnect(target);
+    // 将自己添加到连接目标的反向连接中，当对方析构时，对方会使用反向连接自动断开和当前的连接
+    // 如果连接的是自己，则不连接
+    if (target != owner) {
+        target->_s->_inverses.insert(this);
+    }
 
     return s;
 }
@@ -373,7 +385,9 @@ Slots::slot_type Signals::_connect(signal_t const &sig, Slot::callback_type cb, 
     s->target = target;
     ss->add(s);
 
-    _inverseConnect(target);
+    if (target != owner) {
+        target->_s->_inverses.insert(this);
+    }
 
     return s;
 }
@@ -398,15 +412,15 @@ void Signals::emit(signal_t const &sig, Slot::data_type d, Slot::tunnel_type t) 
     auto targets = snaps->emit(d, t);
     if (!targets.empty()) {
         // 收集所有被移除的target，并断开反向连接
-        for (auto &iter:targets) {
+        for (auto &iter: targets) {
             if (!isConnectedOfTarget(iter)) {
-                _inverseDisconnect(iter);
+                iter->_s->_inverses.erase(const_cast<Signals*>(this));
             }
         }
     }
 }
 
-void Signals::disconnectOfTarget(Object *target, bool inv) {
+void Signals::disconnectOfTarget(Object *target) {
     if (target == nullptr)
         return;
 
@@ -414,8 +428,10 @@ void Signals::disconnectOfTarget(Object *target, bool inv) {
         iter.second->disconnect(nullptr, target);
     }
 
-    if (inv) {
-        _inverseDisconnect(target);
+    if (target != owner) {
+        if (!isConnectedOfTarget(target)) {
+            target->_s->_inverses.erase(const_cast<Signals*>(this));
+        }
     }
 }
 
@@ -439,7 +455,7 @@ void Signals::disconnect(signal_t const &sig, Slot::pfn_callback_type cb) {
         ss->_slots.clear();
         for (auto &iter:targets) {
             if (!isConnectedOfTarget(iter)) {
-                _inverseDisconnect(iter);
+                iter->_s->_inverses.erase(const_cast<Signals*>(this));
             }
         }
     } else {
@@ -463,13 +479,13 @@ void Signals::disconnect(signal_t const &sig, Slot::pfn_membercallback_type cb, 
         ss->_slots.clear();
         for (auto &iter:targets) {
             if (!isConnectedOfTarget(iter)) {
-                _inverseDisconnect(iter);
+                iter->_s->_inverses.erase(const_cast<Signals*>(this));
             }
         }
     } else {
         // 先清除对应的slot，再判断是否存在和target相连的插槽，如过不存在，则断开反向连接
         if (ss->disconnect(cb, target) && target && !isConnectedOfTarget(target)) {
-            _inverseDisconnect(target);
+            target->_s->_inverses.erase(const_cast<Signals*>(this));
         }
     }
 }
@@ -498,22 +514,6 @@ void Signals::unblock(signal_t const &sig) {
 bool Signals::isblocked(signal_t const &sig) const {
     auto fnd = _signals.find(sig);
     return fnd != _signals.end() ? fnd->second->isblocked() : false;
-}
-
-void Signals::_inverseConnect(Object *target) {
-    if (target == nullptr)
-        return;
-    if (&target->signals() == this)
-        return;
-    target->signals()._invs.insert(this);
-}
-
-void Signals::_inverseDisconnect(Object *target) const {
-    if (target == nullptr)
-        return;
-    if (&target->signals() == this)
-        return;
-    target->signals()._invs.erase((Signals*)this);
 }
 
 SS_END

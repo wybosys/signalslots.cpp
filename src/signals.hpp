@@ -269,7 +269,7 @@ public:
     void emit(signal_t const& sig, Slot::data_type data = nullptr, Slot::tunnel_type tunnel = nullptr) const;
 
     // 断开连接
-    void disconnectOfTarget(Object *target, bool inv = true);
+    void disconnectOfTarget(Object *target);
 
     void disconnect(signal_t const &sig);
 
@@ -295,13 +295,8 @@ protected:
 
 private:
 
-    // 反向登记，当自身 dispose 时，需要和对方断开
-    void _inverseConnect(Object *target);
-
-    void _inverseDisconnect(Object* target) const;
-
     // 保存连接到自身信号的对象信号，用于反向断开
-    ::std::set<Signals *> _invs;
+    ::std::set<Signals*> _inverses;
 
     // 保存所有的信号和插槽列表
     typedef ::std::map<signal_t, slots_type> signals_type;
