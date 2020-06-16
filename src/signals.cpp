@@ -260,7 +260,8 @@ Signals::~Signals() {
 
 void Signals::clear() {
     // 清空反向的连接
-    for (auto &iter: _inverses) {
+    auto snaps = _inverses;
+    for (auto &iter: snaps) {
         if (iter->owner && iter->owner != owner) {
             iter->owner->signals().disconnectOfTarget(owner);
         }
