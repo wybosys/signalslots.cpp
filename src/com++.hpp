@@ -12,6 +12,7 @@
 #include <atomic>
 #include <string>
 #include <memory>
+#include <algorithm>
 #include <functional>
 #include <initializer_list>
 #include <vector>
@@ -39,12 +40,12 @@ typedef struct
 static bool operator<(IID const &l, IID const &r)
 {
     return l.d1 < r.d1 || l.d2 < r.d2 || l.d3 < r.d3 || l.d4.d2.d1 < r.d4.d2.d1 ||
-           l.d4.d2.d2 < r.d4.d2.d2;
+        l.d4.d2.d2 < r.d4.d2.d2;
 }
 
 template<typename TObject = class IObject,
-        typename TString = ::std::string,
-        typename TBytes = ::std::vector<unsigned char>
+    typename TString = ::std::string,
+    typename TBytes = ::std::vector<unsigned char>
 >
 class VariantTypes
 {
@@ -94,7 +95,7 @@ public:
 
     Variant(void *);
 
-    Variant(nullptr_t);
+    Variant(::std::nullptr_t);
 
     Variant(int);
 
@@ -225,7 +226,8 @@ class RefObject
 {
 public:
 
-    RefObject() : _referencedCount(1)
+    RefObject()
+        : _referencedCount(1)
     {}
 
     virtual ~RefObject() = default;
@@ -233,7 +235,8 @@ public:
     virtual IMP *grab() const
     {
         ++_referencedCount;
-        return (IMP *)this;
+        return (IMP * )
+        this;
     }
 
     virtual bool drop() const
@@ -250,7 +253,7 @@ private:
 };
 
 class IObject
-        : public RefObject<long, IObject>
+    : public RefObject<long, IObject>
 {
 public:
 
@@ -263,13 +266,15 @@ template<typename T>
 class shared_ref
 {
 public:
-    shared_ref(T *obj) : _ptr(obj)
+    shared_ref(T *obj)
+        : _ptr(obj)
     {
         if (_ptr)
             _ptr = _ptr->grab();
     }
 
-    shared_ref(shared_ref const &r) : _ptr(r._ptr)
+    shared_ref(shared_ref const &r)
+        : _ptr(r._ptr)
     {
         if (_ptr)
             _ptr = _ptr->grab();
@@ -301,7 +306,7 @@ template<typename T, class... Args>
 inline shared_ref<T> make_shared_ref(Args &&... args)
 {
     T *obj = new T(::std::forward<Args>(args)...);
-    shared_ref <T> r(obj);
+    shared_ref<T> r(obj);
     obj->drop();
     return r;
 }
@@ -313,11 +318,12 @@ inline shared_ref<T> make_shared_ref(Args &&... args)
     const COMXX_NS::IID name
 
 COMXX_DEFINE(IID_NEW) = {
-        0xd0733610, 0x6360, 0x4362, {0xb9, 0x42, 0xf4, 0xdb, 0xd2, 0x25, 0x69, 0xf4}};
-COMXX_DEFINE(IID_CLONE) = {
-        0x3e670b35, 0xdd3e, 0x4530, {0xb2, 0xff, 0x77, 0x12, 0xb3, 0x5d, 0xf4, 0x93}};
+    0xd0733610, 0x6360, 0x4362, {0xb9, 0x42, 0xf4, 0xdb, 0xd2, 0x25, 0x69, 0xf4}};
 
-class CustomObject : public IObject
+COMXX_DEFINE(IID_CLONE) = {
+    0x3e670b35, 0xdd3e, 0x4530, {0xb2, 0xff, 0x77, 0x12, 0xb3, 0x5d, 0xf4, 0x93}};
+
+class CustomObject: public IObject
 {
 public:
     CustomObject() = default;
@@ -367,7 +373,8 @@ inline bool drop<IObject *>(IObject *v)
 }
 
 template<typename Types>
-inline Variant<Types>::Variant(object_type *v) : vt(VT::OBJECT)
+inline Variant<Types>::Variant(object_type *v)
+    : vt(VT::OBJECT)
 {
     _pod.o = v;
     if (_pod.o) {
@@ -376,87 +383,108 @@ inline Variant<Types>::Variant(object_type *v) : vt(VT::OBJECT)
 }
 
 template<typename Types>
-inline Variant<Types>::Variant() : vt(VT::NIL)
+inline Variant<Types>::Variant()
+    : vt(VT::NIL)
 {}
 
 template<typename Types>
-inline Variant<Types>::Variant(void *v) : vt(VT::POINTER)
+inline Variant<Types>::Variant(void *v)
+    : vt(VT::POINTER)
 { _pod.p = v; }
 
 template<typename Types>
-inline Variant<Types>::Variant(nullptr_t) : vt(VT::POINTER)
+inline Variant<Types>::Variant(::std::nullptr_t)
+    : vt(VT::POINTER)
 { _pod.p = nullptr; }
 
 template<typename Types>
-inline Variant<Types>::Variant(int v) : vt(VT::INT)
+inline Variant<Types>::Variant(int v)
+    : vt(VT::INT)
 { _pod.i = v; }
 
 template<typename Types>
-inline Variant<Types>::Variant(unsigned int v) : vt(VT::UINT)
+inline Variant<Types>::Variant(unsigned int v)
+    : vt(VT::UINT)
 { _pod.ui = v; }
 
 template<typename Types>
-inline Variant<Types>::Variant(long v) : vt(VT::LONG)
+inline Variant<Types>::Variant(long v)
+    : vt(VT::LONG)
 { _pod.l = v; }
 
 template<typename Types>
-inline Variant<Types>::Variant(unsigned long v) : vt(VT::ULONG)
+inline Variant<Types>::Variant(unsigned long v)
+    : vt(VT::ULONG)
 { _pod.ul = v; }
 
 template<typename Types>
-inline Variant<Types>::Variant(short v) : vt(VT::SHORT)
+inline Variant<Types>::Variant(short v)
+    : vt(VT::SHORT)
 { _pod.s = v; }
 
 template<typename Types>
-inline Variant<Types>::Variant(unsigned short v) : vt(VT::USHORT)
+inline Variant<Types>::Variant(unsigned short v)
+    : vt(VT::USHORT)
 { _pod.us = v; }
 
 template<typename Types>
-inline Variant<Types>::Variant(long long v) : vt(VT::LONGLONG)
+inline Variant<Types>::Variant(long long v)
+    : vt(VT::LONGLONG)
 { _pod.ll = v; }
 
 template<typename Types>
-inline Variant<Types>::Variant(unsigned long long v) : vt(VT::ULONGLONG)
+inline Variant<Types>::Variant(unsigned long long v)
+    : vt(VT::ULONGLONG)
 { _pod.ull = v; }
 
 template<typename Types>
-inline Variant<Types>::Variant(float v) : vt(VT::FLOAT)
+inline Variant<Types>::Variant(float v)
+    : vt(VT::FLOAT)
 { _pod.f = v; }
 
 template<typename Types>
-inline Variant<Types>::Variant(double v) : vt(VT::DOUBLE)
+inline Variant<Types>::Variant(double v)
+    : vt(VT::DOUBLE)
 { _pod.d = v; }
 
 template<typename Types>
-inline Variant<Types>::Variant(char v) : vt(VT::CHAR)
+inline Variant<Types>::Variant(char v)
+    : vt(VT::CHAR)
 { _pod.c = v; }
 
 template<typename Types>
-inline Variant<Types>::Variant(unsigned char v) : vt(VT::UCHAR)
+inline Variant<Types>::Variant(unsigned char v)
+    : vt(VT::UCHAR)
 { _pod.uc = v; }
 
 template<typename Types>
-inline Variant<Types>::Variant(bool v) : vt(VT::BOOLEAN)
+inline Variant<Types>::Variant(bool v)
+    : vt(VT::BOOLEAN)
 { _pod.b = v; }
 
 template<typename Types>
-inline Variant<Types>::Variant(bytes_type const &v) : vt(VT::BYTES)
+inline Variant<Types>::Variant(bytes_type const &v)
+    : vt(VT::BYTES)
 { _bytes = ::std::make_shared<bytes_type>(v); }
 
 template<typename Types>
-inline Variant<Types>::Variant(::std::string const &v) : vt(VT::STRING)
+inline Variant<Types>::Variant(::std::string const &v)
+    : vt(VT::STRING)
 { _str = ::std::make_shared<string_type>(v); }
 
 template<typename Types>
-inline Variant<Types>::Variant(char const *v) : vt(VT::STRING)
+inline Variant<Types>::Variant(char const *v)
+    : vt(VT::STRING)
 { _str = ::std::make_shared<string_type>(v); }
 
 template<typename Types>
-inline Variant<Types>::Variant(func_type v) : vt(VT::FUNCTION)
+inline Variant<Types>::Variant(func_type v)
+    : vt(VT::FUNCTION)
 { _pod.fn = v; }
 
 template<typename Types>
-inline Variant<Types>::Variant(Variant const &r) : vt(r.vt)
+inline Variant<Types>::Variant(Variant const &r)
+    : vt(r.vt)
 {
     _pod = r._pod;
     _bytes = r._bytes;
@@ -467,7 +495,8 @@ inline Variant<Types>::Variant(Variant const &r) : vt(r.vt)
 }
 
 template<typename Types>
-inline Variant<Types>::Variant(::std::shared_ptr<Variant> const &r) : vt(r->vt)
+inline Variant<Types>::Variant(::std::shared_ptr<Variant> const &r)
+    : vt(r->vt)
 {
     _pod = r->_pod;
     _bytes = r->_bytes;
@@ -758,7 +787,7 @@ public:
 };
 
 template<class R, class... Args>
-struct function_traits<R(*)(Args...)> : public function_traits<R(Args...)>
+struct function_traits<R(*)(Args...)>: public function_traits<R(Args...)>
 {
 };
 
@@ -777,27 +806,27 @@ struct function_traits<R(Args...)>
 };
 
 template<class C, class R, class... Args>
-struct function_traits<R(C::*)(Args...)> : public function_traits<R(Args...)>
+struct function_traits<R(C::*)(Args...)>: public function_traits<R(Args...)>
 {
 };
 
 template<class C, class R, class... Args>
-struct function_traits<R(C::*)(Args...) const> : public function_traits<R(Args...)>
+struct function_traits<R(C::*)(Args...) const>: public function_traits<R(Args...)>
 {
 };
 
 template<class C, class R>
-struct function_traits<R(C::*)> : public function_traits<R(C &)>
+struct function_traits<R(C::*)>: public function_traits<R(C &)>
 {
 };
 
 template<class T>
-struct function_traits<T &> : public function_traits<T>
+struct function_traits<T &>: public function_traits<T>
 {
 };
 
 template<class T>
-struct function_traits<T &&> : public function_traits<T>
+struct function_traits<T &&>: public function_traits<T>
 {
 };
 
